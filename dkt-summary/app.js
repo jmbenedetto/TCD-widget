@@ -144,7 +144,14 @@ function renderTable(records) {
 
   summaryTableEl.replaceChildren(buildHeader(labelRow), buildBody(itemRows, totalRow));
   matrixShellEl.hidden = false;
-  setStatus(`Loaded ${itemRows.length} SKU rows directly from the selected Grist backing table.`);
+
+  const firstRowKeys = Object.keys(normalizedRecords[0] || {});
+  const hasRecognizedFields = itemRows.some((row) => row.id_material || row.descricao || row.total !== undefined);
+  if (hasRecognizedFields) {
+    setStatus(`Loaded ${itemRows.length} SKU rows directly from the selected Grist backing table.`);
+  } else {
+    setStatus(`Loaded ${itemRows.length} rows, but the widget did not recognize the record shape. Keys: ${firstRowKeys.join(', ') || '(none)'}.`);
+  }
 
   if (totalRow && totalRow.total !== undefined && totalRow.total !== null && totalRow.total !== '') {
     summaryPillEl.hidden = false;
