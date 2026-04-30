@@ -169,30 +169,25 @@ function formatPillValue(value) {
   return String(value);
 }
 
-function rowsFromSelectedTablePayload(payload) {
-  if (Array.isArray(payload)) {
-    return payload;
-  }
-  if (!payload || typeof payload !== 'object') {
-    return [];
-  }
-  const keys = Object.keys(payload);
-  const rowCount = Math.max(0, ...keys.map((key) => Array.isArray(payload[key]) ? payload[key].length : 0));
-  return Array.from({ length: rowCount }, (_, index) => {
-    const row = {};
-    for (const key of keys) {
-      row[key] = Array.isArray(payload[key]) ? payload[key][index] : payload[key];
-    }
-    return row;
-  });
-}
-
 async function refreshFromGrist() {
-  if (!window.grist?.fetchSelectedTable) {
+  if (!window.grist?.getAccessToken || !window.grist?.getSelectedTableId) {
     return;
   }
-  const payload = await window.grist.fetchSelectedTable({ includeColumns: 'all', format: 'columns' });
-  renderTable(rowsFromSelectedTablePayload(payload));
+  const [{ token, baseUrl }, tableId] = await Promise.all([
+    window.grist.getAccessToken(),
+    window.grist.getSelectedTableId(),
+  ]);
+  const response = await fetch(`${baseUrl}/tables/${encodeURIComponent(tableId)}/records`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const payload = await response.json();
+  const records = (payload.records || []).map((record) => ({
+    id: record.id,
+    ...(record.fields || {}),
+  }));
+  renderTable(records);
 }
 
 if (window.grist) {
