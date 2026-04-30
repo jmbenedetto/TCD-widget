@@ -11,6 +11,7 @@ const META_COLUMNS = [
 ];
 
 const MONTH_FIELDS = Array.from({ length: 13 }, (_, index) => `m${String(index).padStart(2, '0')}`);
+const REQUESTED_COLUMNS = [...META_COLUMNS.map((column) => ({ name: column.id, optional: true })), ...MONTH_FIELDS.map((fieldId) => ({ name: fieldId, optional: true }))];
 const MODE_CONFIG = {
   emissao: {
     kicker: 'DKT inventory equation · emissão',
@@ -169,7 +170,7 @@ function formatPillValue(value) {
 }
 
 if (window.grist) {
-  window.grist.ready({ requiredAccess: 'read table' });
+  window.grist.ready({ requiredAccess: 'read table', columns: REQUESTED_COLUMNS });
   window.grist.onRecords((records) => {
     renderTable(records || []);
   });
