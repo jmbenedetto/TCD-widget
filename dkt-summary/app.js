@@ -148,9 +148,9 @@ function renderTable(records) {
   const firstRowKeys = Object.keys(normalizedRecords[0] || {});
   const hasRecognizedFields = itemRows.some((row) => row.id_material || row.descricao || row.total !== undefined);
   if (hasRecognizedFields) {
-    setStatus(`Loaded ${itemRows.length} SKU rows directly from the selected Grist backing table.`);
+    setStatus(`Loaded ${itemRows.length} SKU rows directly from the selected Grist backing table. First row keys: ${firstRowKeys.join(', ') || '(none)'}.`);
   } else {
-    setStatus(`Loaded ${itemRows.length} rows, but the widget did not recognize the record shape. Keys: ${firstRowKeys.join(', ') || '(none)'}.`);
+    setStatus(`Loaded ${itemRows.length} rows, but the widget did not recognize the record shape. First row: ${JSON.stringify(normalizedRecords[0] || {}).slice(0, 240)}.`);
   }
 
   if (totalRow && totalRow.total !== undefined && totalRow.total !== null && totalRow.total !== '') {
