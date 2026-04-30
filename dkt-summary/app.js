@@ -130,9 +130,10 @@ function buildDataRow(row, isTotal) {
 }
 
 function renderTable(records) {
-  const labelRow = records.find((row) => !row.id_material);
-  const totalRow = records.find((row) => String(row.id_material || '').trim().toUpperCase() === 'TOTAL GERAL');
-  const itemRows = records.filter((row) => row !== labelRow && row !== totalRow);
+  const normalizedRecords = (records || []).map((record) => record?.fields ?? record ?? {});
+  const labelRow = normalizedRecords.find((row) => !row.id_material);
+  const totalRow = normalizedRecords.find((row) => String(row.id_material || '').trim().toUpperCase() === 'TOTAL GERAL');
+  const itemRows = normalizedRecords.filter((row) => row !== labelRow && row !== totalRow);
 
   if (!itemRows.length) {
     matrixShellEl.hidden = true;
