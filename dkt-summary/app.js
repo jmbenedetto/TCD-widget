@@ -169,12 +169,30 @@ function formatPillValue(value) {
   return String(value);
 }
 
+function rowsFromSelectedTablePayload(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (!payload || typeof payload !== 'object') {
+    return [];
+  }
+  const keys = Object.keys(payload);
+  const rowCount = Math.max(0, ...keys.map((key) => Array.isArray(payload[key]) ? payload[key].length : 0));
+  return Array.from({ length: rowCount }, (_, index) => {
+    const row = {};
+    for (const key of keys) {
+      row[key] = Array.isArray(payload[key]) ? payload[key][index] : payload[key];
+    }
+    return row;
+  });
+}
+
 async function refreshFromGrist() {
   if (!window.grist?.fetchSelectedTable) {
     return;
   }
-  const records = await window.grist.fetchSelectedTable({ includeColumns: 'all', format: 'rows' });
-  renderTable(records || []);
+  const payload = await window.grist.fetchSelectedTable({ includeColumns: 'all', format: 'columns' });
+  renderTable(rowsFromSelectedTablePayload(payload));
 }
 
 if (window.grist) {
