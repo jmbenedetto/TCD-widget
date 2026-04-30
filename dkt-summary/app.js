@@ -173,7 +173,7 @@ if (window.grist) {
   window.grist.ready({ requiredAccess: 'read table', columns: REQUESTED_COLUMNS });
   window.grist.onRecords((records) => {
     renderTable(records || []);
-  });
+  }, { includeColumns: 'all' });
 } else {
   setStatus('This widget must be opened inside Grist.');
 }
