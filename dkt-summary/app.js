@@ -169,33 +169,11 @@ function formatPillValue(value) {
   return String(value);
 }
 
-async function refreshFromGrist() {
-  if (!window.grist?.getAccessToken || !window.grist?.getSelectedTableId) {
-    return;
-  }
-  const [{ token, baseUrl }, tableId] = await Promise.all([
-    window.grist.getAccessToken(),
-    window.grist.getSelectedTableId(),
-  ]);
-  const response = await fetch(`${baseUrl}/tables/${encodeURIComponent(tableId)}/records`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  const payload = await response.json();
-  const records = (payload.records || []).map((record) => ({
-    id: record.id,
-    ...(record.fields || {}),
-  }));
-  renderTable(records);
-}
-
 if (window.grist) {
   window.grist.ready({ requiredAccess: 'read table', columns: REQUESTED_COLUMNS });
-  window.grist.onRecords(() => {
-    void refreshFromGrist();
+  window.grist.onRecords((records) => {
+    renderTable(records || []);
   }, { includeColumns: 'all' });
-  void refreshFromGrist();
 } else {
   setStatus('This widget must be opened inside Grist.');
 }
