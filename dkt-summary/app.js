@@ -169,11 +169,20 @@ function formatPillValue(value) {
   return String(value);
 }
 
+async function refreshFromGrist() {
+  if (!window.grist?.fetchSelectedTable) {
+    return;
+  }
+  const records = await window.grist.fetchSelectedTable({ includeColumns: 'all', format: 'rows' });
+  renderTable(records || []);
+}
+
 if (window.grist) {
   window.grist.ready({ requiredAccess: 'read table', columns: REQUESTED_COLUMNS });
-  window.grist.onRecords((records) => {
-    renderTable(records || []);
+  window.grist.onRecords(() => {
+    void refreshFromGrist();
   }, { includeColumns: 'all' });
+  void refreshFromGrist();
 } else {
   setStatus('This widget must be opened inside Grist.');
 }
