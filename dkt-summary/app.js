@@ -162,8 +162,8 @@ function formatPillValue(value) {
 }
 
 if (window.grist) {
-  grist.ready({ requiredAccess: 'read table' });
-  grist.onRecords((records) => {
+  window.grist.ready({ requiredAccess: 'read table' });
+  window.grist.onRecords((records) => {
     renderTable(records || []);
   });
 } else {
