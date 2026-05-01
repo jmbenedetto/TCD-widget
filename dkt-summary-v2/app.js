@@ -235,11 +235,18 @@ function formatFlag(value) {
   return `<span class="flag-pill ${kind}">${normalized === 1 ? '1' : '0'}</span>`;
 }
 
+function hasLatestOrderPeriod(row) {
+  const value = readMappedField(row, 'latestOrderPeriod');
+  return value !== null && value !== undefined && String(value).trim() !== '';
+}
+
 function buildDisplayRows(rows) {
   const modeConfig = getModeConfig();
   const groups = new Map();
   const monthLabels = Object.fromEntries(MONTH_FIELDS.map((fieldId) => [fieldId, fieldId]));
   let skippedRows = 0;
+  let excludedProposalRows = 0;
+  let excludedProposalUnits = 0;
 
   for (const rawRow of rows) {
     const row = normalizeRow(rawRow);
@@ -250,7 +257,14 @@ function buildDisplayRows(rows) {
       continue;
     }
 
-    const proposalQty = toNumber(readMappedField(row, 'proposalQty'));
+    const rawProposalQty = toNumber(readMappedField(row, 'proposalQty'));
+    const isActionableProposal = rawProposalQty <= 0 || hasLatestOrderPeriod(row);
+    const proposalQty = isActionableProposal ? rawProposalQty : 0;
+    if (!isActionableProposal) {
+      excludedProposalRows += 1;
+      excludedProposalUnits += rawProposalQty;
+    }
+
     const monthLabel = readMappedField(row, 'monthLabel');
     if (monthLabel) {
       monthLabels[period] = String(monthLabel);
@@ -323,6 +337,8 @@ function buildDisplayRows(rows) {
     displayRows: [...displayRows, totalRow],
     skuCount: displayRows.length,
     skippedRows,
+    excludedProposalRows,
+    excludedProposalUnits,
     totalUnits: totalRow.total,
     monthLabels,
   };
@@ -413,14 +429,14 @@ async function renderFromRows(rows, sourceLabel) {
   latestRows = rows;
   latestSourceLabel = sourceLabel;
   const modeConfig = getModeConfig();
-  const { displayRows, skuCount, skippedRows, totalUnits, monthLabels } = buildDisplayRows(rows);
+  const { displayRows, skuCount, skippedRows, excludedProposalRows, excludedProposalUnits, totalUnits, monthLabels } = buildDisplayRows(rows);
   ensureTable(buildColumns(monthLabels));
   await table.replaceData(displayRows);
   setElementVisible(tableShellEl, true);
   setElementVisible(summaryPillEl, true);
   summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${numberFormatter.format(skuCount)} SKUs · ${numberFormatter.format(totalUnits)} un.`;
   setStatus(
-    `Fonte: ${currentTableId || SOURCE_TABLE_ID}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(skuCount)} SKUs renderizados, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12. Campos usados: ${modeConfig.fieldsNote}`,
+    `Fonte: ${currentTableId || SOURCE_TABLE_ID}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(skuCount)} SKUs renderizados, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12, ${numberFormatter.format(excludedProposalRows)} linhas de proposta excluídas por não terem último período possível de pedido, total excluído de ${numberFormatter.format(excludedProposalUnits)} un. Campos usados: ${modeConfig.fieldsNote}`,
     { visible: debugMode }
   );
 }
