@@ -209,6 +209,25 @@ h1 {
   font-weight: 700;
 }
 
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter {
+  margin-top: 6px;
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter input,
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter select {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.84rem;
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter input::placeholder {
+  color: var(--muted);
+}
+
 .tabulator .tabulator-header .tabulator-col.tabulator-frozen {
   background: #eef4fb;
 }

@@ -344,6 +344,58 @@ function buildDisplayRows(rows) {
   };
 }
 
+function textHeaderFilter(placeholder = 'Filtrar') {
+  return {
+    headerFilter: 'input',
+    headerFilterFunc: 'like',
+    headerFilterPlaceholder: placeholder,
+  };
+}
+
+function listHeaderFilter() {
+  return {
+    headerFilter: 'list',
+    headerFilterFunc: (headerValue, rowValue) => {
+      if (headerValue === null || headerValue === undefined || headerValue === '') {
+        return true;
+      }
+      return String(rowValue ?? '') === String(headerValue);
+    },
+    headerFilterParams: {
+      valuesLookup: true,
+      clearable: true,
+      sort: 'asc',
+    },
+  };
+}
+
+function numericHeaderFilter(placeholder = '>=') {
+  return {
+    headerFilter: 'input',
+    headerFilterFunc: (headerValue, rowValue) => {
+      if (headerValue === null || headerValue === undefined || String(headerValue).trim() === '') {
+        return true;
+      }
+      return toNumber(rowValue) >= toNumber(headerValue);
+    },
+    headerFilterPlaceholder: placeholder,
+  };
+}
+
+function updateSummaryFromVisibleRows(rows) {
+  const modeConfig = getModeConfig();
+  const visibleRows = (rows || []).filter((row) => row && row._rowType !== 'total');
+  const visibleUnits = visibleRows.reduce((sum, row) => sum + toNumber(row.total), 0);
+  summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${numberFormatter.format(visibleRows.length)} SKUs · ${numberFormatter.format(visibleUnits)} un.`;
+}
+
+function refreshVisibleSummaryFromTable() {
+  if (!table) {
+    return;
+  }
+  updateSummaryFromVisibleRows(table.getRows('active').map((row) => row.getData()));
+}
+
 function buildColumns(monthLabels) {
   const baseColumns = [
     {
@@ -354,6 +406,7 @@ function buildColumns(monthLabels) {
       resizable: true,
       cssClass: 'frozen-meta',
       formatter: (cell) => escapeHtml(cell.getValue() || '—'),
+      ...textHeaderFilter('SKU'),
     },
     {
       title: 'Descrição',
@@ -364,6 +417,7 @@ function buildColumns(monthLabels) {
       resizable: true,
       cssClass: 'frozen-meta wrap-cell',
       formatter: (cell) => escapeHtml(cell.getValue() || '—'),
+      ...textHeaderFilter('Descrição'),
     },
     {
       title: 'Fornecedor',
@@ -374,14 +428,15 @@ function buildColumns(monthLabels) {
       resizable: true,
       cssClass: 'frozen-meta wrap-cell',
       formatter: (cell) => escapeHtml(cell.getValue() || '—'),
+      ...listHeaderFilter(),
     },
-    { title: 'Categoria', field: 'categoria', width: 170, minWidth: 140, resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—') },
-    { title: 'ABC', field: 'abc', width: 86, hozAlign: 'center', resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—') },
-    { title: 'Custo un.', field: 'custo_unit', width: 118, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()) },
-    { title: 'Lote', field: 'lote', width: 96, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()) },
-    { title: 'Validar', field: 'flag_validate', width: 96, hozAlign: 'center', resizable: true, formatter: (cell) => formatFlag(cell.getValue()) },
-    { title: 'Últ. pedido', field: 'latest_order_period', width: 120, hozAlign: 'center', resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—') },
-    { title: 'Total', field: 'total', width: 120, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()) },
+    { title: 'Categoria', field: 'categoria', width: 170, minWidth: 140, resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—'), ...listHeaderFilter() },
+    { title: 'ABC', field: 'abc', width: 86, hozAlign: 'center', resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—'), ...listHeaderFilter() },
+    { title: 'Custo un.', field: 'custo_unit', width: 118, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()), ...numericHeaderFilter() },
+    { title: 'Lote', field: 'lote', width: 96, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()), ...numericHeaderFilter() },
+    { title: 'Validar', field: 'flag_validate', width: 96, hozAlign: 'center', resizable: true, formatter: (cell) => formatFlag(cell.getValue()), ...listHeaderFilter() },
+    { title: 'Últ. pedido', field: 'latest_order_period', width: 120, hozAlign: 'center', resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—'), ...listHeaderFilter() },
+    { title: 'Total', field: 'total', width: 120, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()), ...numericHeaderFilter() },
   ];
 
   const monthColumns = MONTH_FIELDS.map((fieldId) => ({
@@ -394,6 +449,7 @@ function buildColumns(monthLabels) {
     cssClass: 'numeric-cell',
     headerSort: false,
     formatter: (cell) => formatNumeric(cell.getValue()),
+    ...numericHeaderFilter(),
   }));
 
   return [...baseColumns, ...monthColumns];
@@ -420,6 +476,15 @@ function ensureTable(columns) {
         }
       },
     });
+    table.on('dataFiltered', refreshVisibleSummaryFromTable);
+    const tableEl = document.getElementById('summary-table');
+    tableEl?.addEventListener('change', () => setTimeout(refreshVisibleSummaryFromTable, 0));
+    tableEl?.addEventListener('input', () => setTimeout(refreshVisibleSummaryFromTable, 0));
+    tableEl?.addEventListener('keyup', (event) => {
+      if (event.key === 'Enter') {
+        setTimeout(refreshVisibleSummaryFromTable, 0);
+      }
+    });
     return;
   }
   table.setColumns(columns);
@@ -434,7 +499,7 @@ async function renderFromRows(rows, sourceLabel) {
   await table.replaceData(displayRows);
   setElementVisible(tableShellEl, true);
   setElementVisible(summaryPillEl, true);
-  summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${numberFormatter.format(skuCount)} SKUs · ${numberFormatter.format(totalUnits)} un.`;
+  updateSummaryFromVisibleRows(displayRows);
   setStatus(
     `Fonte: ${currentTableId || SOURCE_TABLE_ID}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(skuCount)} SKUs renderizados, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12, ${numberFormatter.format(excludedProposalRows)} linhas de proposta excluídas por não terem último período possível de pedido, total excluído de ${numberFormatter.format(excludedProposalUnits)} un. Campos usados: ${modeConfig.fieldsNote}`,
     { visible: debugMode }
