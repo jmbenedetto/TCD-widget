@@ -32,41 +32,45 @@ const SOURCE_FIELD_MAP = {
 };
 const MODE_CONFIG = {
   emissao: {
-    kicker: 'DKT inventory equation · Tabulator V2 · emissão',
-    title: 'Monthly order emission review',
-    subtitle: 'Planner-facing matrix built directly from SaidaDados_ProjecaoEstoque. No backing/support summary table.',
+    kicker: 'Planejamento de suprimentos',
+    title: 'Pedidos propostos',
+    subtitle: 'Revise as recomendações por período de emissão.',
     toggleLabel: 'Emissão',
-    statusLabel: 'emissão',
     periodTransform: (row) => normalizePeriod(readMappedField(row, 'period')),
     fieldsNote: 'id_material, periodo, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd.',
   },
   recebimento: {
-    kicker: 'DKT inventory equation · Tabulator V2 · recebimento',
-    title: 'Monthly order arrival review',
-    subtitle: 'Planner-facing matrix derived from direct-source projection rows, shifted by lead time.',
+    kicker: 'Planejamento de suprimentos',
+    title: 'Pedidos propostos',
+    subtitle: 'Revise as recomendações por período de recebimento.',
     toggleLabel: 'Recebimento',
-    statusLabel: 'recebimento',
     periodTransform: (row) => shiftPeriod(normalizePeriod(readMappedField(row, 'period')), toInteger(readMappedField(row, 'leadTime'))),
     fieldsNote: 'id_material, periodo, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd, lead_time_meses.',
   },
 };
 const params = new URLSearchParams(window.location.search);
+const debugMode = params.get('debug') === '1';
 const initialMode = params.get('mode') === 'recebimento' ? 'recebimento' : 'emissao';
 let currentMode = initialMode;
 const statusEl = document.getElementById('status');
+const notesEl = document.getElementById('notes-card');
 const tableShellEl = document.getElementById('table-shell');
+const sourcePillEl = document.getElementById('source-pill');
 const summaryPillEl = document.getElementById('summary-pill');
 const titleEl = document.getElementById('page-title');
 const subtitleEl = document.getElementById('page-subtitle');
 const kickerEl = document.getElementById('mode-kicker');
 const modeToggleButtons = Array.from(document.querySelectorAll('[data-mode-toggle]'));
-const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-const decimalFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const numberFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+const decimalFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 let table = null;
 let currentTableId = null;
 let latestRows = [];
 let latestSourceLabel = null;
 
+notesEl.hidden = !debugMode;
+sourcePillEl.hidden = !debugMode;
+statusEl.hidden = !debugMode;
 applyModeUi();
 
 function getModeConfig() {
@@ -85,8 +89,9 @@ function applyModeUi() {
   }
 }
 
-function setStatus(message) {
+function setStatus(message, { visible = debugMode } = {}) {
   statusEl.textContent = message;
+  statusEl.hidden = !visible;
 }
 
 function getDocApi() {
@@ -287,7 +292,7 @@ function buildDisplayRows(rows) {
     _rowKey: '__total__',
     _rowType: 'total',
     id_material: 'TOTAL GERAL',
-    descricao: `${displayRows.length} SKU rows`,
+    descricao: `${displayRows.length} SKUs`,
     fornecedor: '',
     categoria: '',
     abc: '',
@@ -327,7 +332,7 @@ function buildColumns(monthLabels) {
       formatter: (cell) => escapeHtml(cell.getValue() || '—'),
     },
     {
-      title: 'Description',
+      title: 'Descrição',
       field: 'descricao',
       frozen: true,
       width: 340,
@@ -337,7 +342,7 @@ function buildColumns(monthLabels) {
       formatter: (cell) => escapeHtml(cell.getValue() || '—'),
     },
     {
-      title: 'Supplier',
+      title: 'Fornecedor',
       field: 'fornecedor',
       frozen: true,
       width: 200,
@@ -346,12 +351,12 @@ function buildColumns(monthLabels) {
       cssClass: 'frozen-meta wrap-cell',
       formatter: (cell) => escapeHtml(cell.getValue() || '—'),
     },
-    { title: 'Category', field: 'categoria', width: 170, minWidth: 140, resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—') },
+    { title: 'Categoria', field: 'categoria', width: 170, minWidth: 140, resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—') },
     { title: 'ABC', field: 'abc', width: 86, hozAlign: 'center', resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—') },
-    { title: 'Unit cost', field: 'custo_unit', width: 118, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()) },
-    { title: 'Lot', field: 'lote', width: 96, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()) },
-    { title: 'Validate', field: 'flag_validate', width: 96, hozAlign: 'center', resizable: true, formatter: (cell) => formatFlag(cell.getValue()) },
-    { title: 'Last order', field: 'latest_order_period', width: 120, hozAlign: 'center', resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—') },
+    { title: 'Custo un.', field: 'custo_unit', width: 118, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()) },
+    { title: 'Lote', field: 'lote', width: 96, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()) },
+    { title: 'Validar', field: 'flag_validate', width: 96, hozAlign: 'center', resizable: true, formatter: (cell) => formatFlag(cell.getValue()) },
+    { title: 'Últ. pedido', field: 'latest_order_period', width: 120, hozAlign: 'center', resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—') },
     { title: 'Total', field: 'total', width: 120, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()) },
   ];
 
@@ -381,7 +386,7 @@ function ensureTable(columns) {
       movableColumns: false,
       resizableColumns: true,
       selectableRows: false,
-      placeholder: 'No direct-source rows available.',
+      placeholder: 'Nenhuma linha encontrada na fonte de dados.',
       rowFormatter: (row) => {
         const element = row.getElement();
         if (row.getData()?._rowType === 'total') {
@@ -405,14 +410,10 @@ async function renderFromRows(rows, sourceLabel) {
   await table.replaceData(displayRows);
   tableShellEl.hidden = false;
   summaryPillEl.hidden = false;
-  summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${numberFormatter.format(skuCount)} SKU rows · ${numberFormatter.format(totalUnits)} total units`;
-
-  const tableLabel = currentTableId || SOURCE_TABLE_ID;
+  summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${numberFormatter.format(skuCount)} SKUs · ${numberFormatter.format(totalUnits)} un.`;
   setStatus(
-    `Loaded ${numberFormatter.format(rows.length)} direct-source rows from ${tableLabel} via ${sourceLabel}. ` +
-      `Rendered ${numberFormatter.format(skuCount)} planner rows for mode=${currentMode}. ` +
-      `Skipped ${numberFormatter.format(skippedRows)} rows outside the visible M00-M12 window. ` +
-      `Fields used: ${modeConfig.fieldsNote}`
+    `Fonte: ${currentTableId || SOURCE_TABLE_ID}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(skuCount)} SKUs renderizados, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12. Campos usados: ${modeConfig.fieldsNote}`,
+    { visible: debugMode }
   );
 }
 
@@ -451,12 +452,12 @@ async function applyMode(nextMode) {
     await renderFromRows(latestRows, latestSourceLabel || 'cached direct-source rows');
     return;
   }
-  setStatus(`Waiting for direct-source rows. Current mode=${currentMode}.`);
+  setStatus(`Carregando visão de ${MODE_CONFIG[nextMode].toggleLabel.toLowerCase()}...`, { visible: debugMode });
 }
 
 async function refreshRows(reason) {
   try {
-    setStatus(`Loading direct-source rows (${reason})...`);
+    setStatus(`Carregando dados (${reason})...`, { visible: debugMode });
 
     if (currentTableId === SOURCE_TABLE_ID && latestRows.length) {
       await renderFromRows(latestRows, 'grist.onRecords');
@@ -483,12 +484,12 @@ async function refreshRows(reason) {
 
     tableShellEl.hidden = true;
     summaryPillEl.hidden = true;
-    setStatus('No rows were returned from the direct source table.');
+    setStatus('Nenhuma linha foi retornada pela fonte de dados.', { visible: true });
   } catch (error) {
     tableShellEl.hidden = true;
     summaryPillEl.hidden = true;
     const message = error instanceof Error ? error.message : String(error);
-    setStatus(`Failed to load direct-source rows: ${message}`);
+    setStatus(`Não foi possível carregar os dados: ${message}`, { visible: true });
     console.error(error);
   }
 }
@@ -518,5 +519,5 @@ if (window.grist) {
 
   void refreshRows('initial load');
 } else {
-  setStatus('This widget must be opened inside Grist.');
+  setStatus('Este widget precisa ser aberto dentro do Grist.', { visible: true });
 }

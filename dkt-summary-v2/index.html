@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DKT Summary Tabulator V2</title>
+    <title>Pedidos propostos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6.3.0/dist/css/tabulator.min.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260501b" />
+    <link rel="stylesheet" href="./styles.css?v=20260501c" />
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <script src="https://unpkg.com/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
   </head>
@@ -15,33 +15,33 @@
     <main class="app-shell">
       <header class="app-header">
         <div class="title-block">
-          <p id="mode-kicker" class="kicker">DKT inventory equation · tabulator</p>
-          <h1 id="page-title">Planner matrix</h1>
-          <p id="page-subtitle" class="subtitle">Waiting for direct Grist source rows.</p>
+          <p id="mode-kicker" class="kicker">Planejamento de suprimentos</p>
+          <h1 id="page-title">Pedidos propostos</h1>
+          <p id="page-subtitle" class="subtitle">Aguardando dados do Grist.</p>
         </div>
         <div class="header-controls">
-          <div class="mode-toggle-card" aria-label="View mode toggle">
-            <span class="mode-toggle-label">View mode</span>
-            <div class="mode-toggle" role="group" aria-label="Emission or receipt mode">
+          <div class="mode-toggle-card" aria-label="Alternância de modo de visualização">
+            <span class="mode-toggle-label">Visão</span>
+            <div class="mode-toggle" role="group" aria-label="Emissão ou recebimento">
               <button type="button" class="mode-toggle-button" data-mode-toggle="emissao">Emissão</button>
               <button type="button" class="mode-toggle-button" data-mode-toggle="recebimento">Recebimento</button>
             </div>
           </div>
           <div class="header-pills">
-            <div id="source-pill" class="summary-pill source-pill">Direct source: <code>SaidaDados_ProjecaoEstoque</code></div>
+            <div id="source-pill" class="summary-pill source-pill">Fonte direta: <code>SaidaDados_ProjecaoEstoque</code></div>
             <div id="summary-pill" class="summary-pill" hidden></div>
           </div>
         </div>
       </header>
 
-      <section id="status" class="status-card">Waiting for Grist data.</section>
+      <section id="status" class="status-card">Aguardando dados.</section>
 
-      <section class="notes-card">
-        <strong>V2 rules.</strong>
-        <span>Reads directly from <code>SaidaDados_ProjecaoEstoque</code>.</span>
-        <span>No backing/support summary table.</span>
-        <span>Same widget supports both emissão and recebimento with an in-page toggle.</span>
-        <span>Tabulator provides frozen columns, resize, and horizontal scroll.</span>
+      <section id="notes-card" class="notes-card">
+        <strong>Diagnóstico técnico.</strong>
+        <span>Lê diretamente de <code>SaidaDados_ProjecaoEstoque</code>.</span>
+        <span>Sem tabela de apoio.</span>
+        <span>Mesmo widget atende emissão e recebimento com toggle.</span>
+        <span>Use <code>?debug=1</code> para manter estes detalhes visíveis.</span>
       </section>
 
       <section id="table-shell" class="table-shell" hidden>
@@ -49,6 +49,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260501b"></script>
+    <script src="./app.js?v=20260501c"></script>
   </body>
 </html>
