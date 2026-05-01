@@ -39,7 +39,7 @@ button {
 
 .app-shell {
   min-height: 100vh;
-  padding: 24px;
+  padding: 14px;
 }
 
 .app-header,
@@ -55,65 +55,68 @@ button {
 .app-header {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
-  align-items: flex-start;
-  padding: 24px;
-  margin-bottom: 16px;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  margin-bottom: 12px;
 }
 
 .title-block {
   max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .kicker {
-  margin: 0 0 8px;
+  margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 0.76rem;
+  font-size: 0.68rem;
   font-weight: 700;
   color: var(--accent);
 }
 
 h1 {
   margin: 0;
-  font-size: 1.8rem;
+  font-size: 1.2rem;
+  line-height: 1.15;
 }
 
 .subtitle {
-  margin: 8px 0 0;
+  margin: 0;
   color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.3;
+  font-size: 0.92rem;
 }
 
 .header-controls {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .mode-toggle-card {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 4px;
+  padding: 8px 10px;
   border: 1px solid var(--card-border);
-  border-radius: 14px;
+  border-radius: 12px;
   background: #f8fbff;
 }
 
 .mode-toggle-label {
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
+  display: none;
 }
 
 .mode-toggle {
   display: inline-flex;
-  gap: 6px;
+  gap: 4px;
   padding: 4px;
   border-radius: 999px;
   background: #eaf1fb;
@@ -122,7 +125,7 @@ h1 {
 .mode-toggle-button {
   border: none;
   border-radius: 999px;
-  padding: 8px 14px;
+  padding: 7px 12px;
   background: transparent;
   color: var(--muted);
   font-weight: 700;
@@ -142,20 +145,23 @@ h1 {
 
 .header-pills {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .summary-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: 6px;
+  padding: 8px 12px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--ink);
   font-weight: 600;
+  font-size: 0.95rem;
 }
 
 .source-pill {
@@ -164,8 +170,8 @@ h1 {
 
 .status-card,
 .notes-card {
-  padding: 14px 16px;
-  margin-bottom: 16px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
 }
 
 .status-card {
@@ -180,7 +186,7 @@ h1 {
 }
 
 .table-shell {
-  padding: 12px;
+  padding: 8px;
 }
 
 #summary-table {
@@ -263,16 +269,22 @@ h1 {
 
 @media (max-width: 900px) {
   .app-shell {
-    padding: 16px;
+    padding: 12px;
   }
 
   .app-header {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .header-controls,
   .header-pills,
   .mode-toggle-card {
     align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .header-controls {
+    width: 100%;
   }
 }
