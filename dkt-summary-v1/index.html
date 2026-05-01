@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DKT Summary Widget</title>
+    <link rel="stylesheet" href="./styles.css?v=20260501g" />
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p id="mode-kicker" class="kicker">DKT inventory equation</p>
+          <h1 id="page-title">Monthly summary</h1>
+          <p id="page-subtitle" class="subtitle">Waiting for Grist data.</p>
+        </div>
+        <div id="summary-pill" class="summary-pill" hidden></div>
+      </header>
+
+      <section id="status" class="status-card">Waiting for Grist data.</section>
+
+      <section id="matrix-shell" class="matrix-shell" hidden>
+        <div class="matrix-scroll">
+          <table id="summary-table" class="summary-table"></table>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js?v=20260501e"></script>
+  </body>
+</html>
