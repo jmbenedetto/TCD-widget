@@ -11,7 +11,36 @@ const META_COLUMNS = [
 ];
 
 const MONTH_FIELDS = Array.from({ length: 13 }, (_, index) => `m${String(index).padStart(2, '0')}`);
-const REQUESTED_COLUMNS = [...META_COLUMNS.map((column) => ({ name: column.id, optional: true })), ...MONTH_FIELDS.map((fieldId) => ({ name: fieldId, optional: true }))];
+const RESIZABLE_COLUMN_IDS = [...META_COLUMNS.map((column) => column.id), ...MONTH_FIELDS];
+const DEFAULT_COLUMN_WIDTHS = {
+  id_material: 118,
+  descricao: 430,
+  fornecedor: 200,
+  categoria: 140,
+  abc: 90,
+  custo_unit: 120,
+  lote: 96,
+  flag_validate: 96,
+  total: 120,
+  ...Object.fromEntries(MONTH_FIELDS.map((fieldId) => [fieldId, 108])),
+};
+const MIN_COLUMN_WIDTHS = {
+  id_material: 90,
+  descricao: 220,
+  fornecedor: 150,
+  categoria: 120,
+  abc: 72,
+  custo_unit: 100,
+  lote: 80,
+  flag_validate: 90,
+  total: 100,
+  ...Object.fromEntries(MONTH_FIELDS.map((fieldId) => [fieldId, 84])),
+};
+const MAX_COLUMN_WIDTH = 960;
+const REQUESTED_COLUMNS = [
+  ...META_COLUMNS.map((column) => ({ name: column.id, optional: true })),
+  ...MONTH_FIELDS.map((fieldId) => ({ name: fieldId, optional: true })),
+];
 const MODE_CONFIG = {
   emissao: {
     kicker: 'DKT inventory equation · emissão',
@@ -28,6 +57,7 @@ const MODE_CONFIG = {
 const params = new URLSearchParams(window.location.search);
 const mode = params.get('mode') === 'recebimento' ? 'recebimento' : 'emissao';
 const modeConfig = MODE_CONFIG[mode];
+const COLUMN_WIDTH_STORAGE_KEY = `dkt-summary-widths:${mode}`;
 
 document.body.classList.add(`mode-${mode}`);
 document.getElementById('mode-kicker').textContent = modeConfig.kicker;
@@ -38,6 +68,10 @@ const statusEl = document.getElementById('status');
 const matrixShellEl = document.getElementById('matrix-shell');
 const summaryTableEl = document.getElementById('summary-table');
 const summaryPillEl = document.getElementById('summary-pill');
+
+let latestMappings = null;
+let columnWidths = loadColumnWidths();
+let resizeState = null;
 
 const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const decimalFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -69,28 +103,151 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+function getDefaultWidth(columnId) {
+  return DEFAULT_COLUMN_WIDTHS[columnId] ?? 108;
+}
+
+function getMinWidth(columnId) {
+  return MIN_COLUMN_WIDTHS[columnId] ?? 84;
+}
+
+function clampColumnWidth(columnId, width) {
+  const numericWidth = Number(width);
+  if (!Number.isFinite(numericWidth)) {
+    return getDefaultWidth(columnId);
+  }
+  return Math.min(MAX_COLUMN_WIDTH, Math.max(getMinWidth(columnId), Math.round(numericWidth)));
+}
+
+function getColumnWidth(columnId) {
+  return clampColumnWidth(columnId, columnWidths[columnId] ?? getDefaultWidth(columnId));
+}
+
+function loadColumnWidths() {
+  try {
+    const raw = window.localStorage.getItem(COLUMN_WIDTH_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter(([columnId]) => RESIZABLE_COLUMN_IDS.includes(columnId))
+        .map(([columnId, width]) => [columnId, clampColumnWidth(columnId, width)]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function persistColumnWidths() {
+  try {
+    window.localStorage.setItem(COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(columnWidths));
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function setColumnWidth(columnId, width, { persist = false } = {}) {
+  columnWidths = {
+    ...columnWidths,
+    [columnId]: clampColumnWidth(columnId, width),
+  };
+  applyColumnWidths();
+  if (persist) {
+    persistColumnWidths();
+  }
+}
+
+function resetColumnWidth(columnId) {
+  const nextWidths = { ...columnWidths };
+  delete nextWidths[columnId];
+  columnWidths = nextWidths;
+  applyColumnWidths();
+  persistColumnWidths();
+}
+
+function applyColumnWidths() {
+  const skuWidth = getColumnWidth('id_material');
+  const descriptionWidth = getColumnWidth('descricao');
+
+  summaryTableEl.style.setProperty('--sticky-left-1', '0px');
+  summaryTableEl.style.setProperty('--sticky-left-2', `${skuWidth}px`);
+  summaryTableEl.style.setProperty('--sticky-left-3', `${skuWidth + descriptionWidth}px`);
+
+  for (const columnId of RESIZABLE_COLUMN_IDS) {
+    const width = `${getColumnWidth(columnId)}px`;
+    summaryTableEl.querySelectorAll(`[data-column-id="${columnId}"]`).forEach((cell) => {
+      cell.style.width = width;
+      cell.style.minWidth = width;
+      cell.style.maxWidth = width;
+    });
+  }
+
+  summaryTableEl.querySelectorAll('.sticky-3').forEach((cell) => {
+    cell.style.boxShadow = `10px 0 16px rgba(18, 32, 51, 0.08)`;
+  });
+}
+
 function buildHeader(labelsRow) {
   const headerRow = document.createElement('tr');
 
   for (const column of META_COLUMNS) {
     const th = document.createElement('th');
     th.className = [column.sticky, column.numeric ? 'numeric' : '', column.className || ''].filter(Boolean).join(' ');
-    th.textContent = column.label;
+    th.dataset.columnId = column.id;
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'header-label';
+    labelEl.textContent = column.label;
+    th.appendChild(labelEl);
+    th.appendChild(buildResizeHandle(column.id, column.label));
     headerRow.appendChild(th);
   }
 
   for (const fieldId of MONTH_FIELDS) {
     const th = document.createElement('th');
     th.className = 'numeric month-col';
-    const monthCode = fieldId.toUpperCase();
-    const monthLabel = labelsRow?.[fieldId] ? escapeHtml(String(labelsRow[fieldId])) : monthCode;
-    th.innerHTML = `${monthCode}<span class="month-label">${monthLabel}</span>`;
+    th.dataset.columnId = fieldId;
+
+    const headerLabelEl = document.createElement('span');
+    headerLabelEl.className = 'header-label';
+
+    const monthCodeEl = document.createElement('span');
+    monthCodeEl.className = 'month-code';
+    monthCodeEl.textContent = fieldId.toUpperCase();
+
+    const monthLabelEl = document.createElement('span');
+    monthLabelEl.className = 'month-label';
+    monthLabelEl.textContent = labelsRow?.[fieldId] ? String(labelsRow[fieldId]) : fieldId.toUpperCase();
+
+    headerLabelEl.append(monthCodeEl, monthLabelEl);
+    th.appendChild(headerLabelEl);
+    th.appendChild(buildResizeHandle(fieldId, fieldId.toUpperCase()));
     headerRow.appendChild(th);
   }
 
   const thead = document.createElement('thead');
   thead.appendChild(headerRow);
   return thead;
+}
+
+function buildResizeHandle(columnId, label) {
+  const handle = document.createElement('button');
+  handle.type = 'button';
+  handle.className = 'resize-handle';
+  handle.dataset.columnId = columnId;
+  handle.setAttribute('aria-label', `Resize ${label} column`);
+  handle.addEventListener('mousedown', startColumnResize);
+  handle.addEventListener('dblclick', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    resetColumnWidth(columnId);
+  });
+  return handle;
 }
 
 function buildBody(itemRows, totalRow) {
@@ -116,6 +273,7 @@ function buildDataRow(row, isTotal) {
   for (const column of META_COLUMNS) {
     const td = document.createElement('td');
     td.className = [column.sticky, column.numeric ? 'numeric' : '', column.className || ''].filter(Boolean).join(' ');
+    td.dataset.columnId = column.id;
     td.innerHTML = formatCellValue(column.id, row[column.id]);
     tr.appendChild(td);
   }
@@ -123,6 +281,7 @@ function buildDataRow(row, isTotal) {
   for (const fieldId of MONTH_FIELDS) {
     const td = document.createElement('td');
     td.className = 'numeric month-col';
+    td.dataset.columnId = fieldId;
     td.innerHTML = formatCellValue(fieldId, row[fieldId]);
     tr.appendChild(td);
   }
@@ -132,6 +291,14 @@ function buildDataRow(row, isTotal) {
 
 function normalizeRecords(records) {
   return (records || []).map((record) => record?.fields ?? record ?? {});
+}
+
+function mapRecords(records, mappings = latestMappings) {
+  if (!window.grist?.mapColumnNames) {
+    return normalizeRecords(records);
+  }
+  const mapped = window.grist.mapColumnNames(records, { mappings, columns: REQUESTED_COLUMNS });
+  return mapped ? normalizeRecords(mapped) : normalizeRecords(records);
 }
 
 function renderTable(records) {
@@ -148,12 +315,13 @@ function renderTable(records) {
   }
 
   summaryTableEl.replaceChildren(buildHeader(labelRow), buildBody(itemRows, totalRow));
+  applyColumnWidths();
   matrixShellEl.hidden = false;
 
   const firstRowKeys = Object.keys(normalizedRecords[0] || {});
   const hasRecognizedFields = itemRows.some((row) => row.id_material || row.descricao || row.total !== undefined);
   if (hasRecognizedFields) {
-    setStatus(`Loaded ${itemRows.length} SKU rows directly from the selected Grist backing table. First row keys: ${firstRowKeys.join(', ') || '(none)'}.`);
+    setStatus(`Loaded ${itemRows.length} SKU rows directly from the selected Grist backing table. Drag any header edge to resize columns. First row keys: ${firstRowKeys.join(', ') || '(none)'}.`);
   } else {
     setStatus(`Loaded ${itemRows.length} rows, but the widget did not recognize the record shape. First row: ${JSON.stringify(normalizedRecords[0] || {}).slice(0, 240)}.`);
   }
@@ -173,6 +341,47 @@ function formatPillValue(value) {
   return String(value);
 }
 
+function startColumnResize(event) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const columnId = event.currentTarget?.dataset?.columnId;
+  if (!columnId) {
+    return;
+  }
+
+  resizeState = {
+    columnId,
+    startX: event.clientX,
+    startWidth: getColumnWidth(columnId),
+  };
+  document.body.classList.add('is-resizing-columns');
+}
+
+function handleColumnResizeMove(event) {
+  if (!resizeState) {
+    return;
+  }
+
+  const deltaX = event.clientX - resizeState.startX;
+  setColumnWidth(resizeState.columnId, resizeState.startWidth + deltaX);
+}
+
+function stopColumnResize() {
+  if (!resizeState) {
+    return;
+  }
+
+  persistColumnWidths();
+  resizeState = null;
+  document.body.classList.remove('is-resizing-columns');
+}
+
+document.addEventListener('mousemove', handleColumnResizeMove);
+document.addEventListener('mouseup', stopColumnResize);
+document.addEventListener('mouseleave', stopColumnResize);
+window.addEventListener('blur', stopColumnResize);
+
 async function fetchSelectedBackingTableRows() {
   return await window.grist.fetchSelectedTable({
     format: 'rows',
@@ -183,7 +392,7 @@ async function refreshFromSelectedBackingTable() {
   try {
     setStatus('Loading summary rows from the selected Grist backing table...');
     const rows = await fetchSelectedBackingTableRows();
-    renderTable(rows);
+    renderTable(mapRecords(rows));
   } catch (error) {
     matrixShellEl.hidden = true;
     summaryPillEl.hidden = true;
@@ -196,6 +405,11 @@ async function refreshFromSelectedBackingTable() {
 if (window.grist) {
   window.grist.ready({ requiredAccess: 'read table', columns: REQUESTED_COLUMNS });
 
+  window.grist.onRecords((records, mappings) => {
+    latestMappings = mappings || latestMappings;
+    renderTable(mapRecords(records, latestMappings));
+  }, { format: 'rows' });
+
   let lastTableId = null;
   window.grist.on('message', (message) => {
     const nextTableId = message?.tableId || null;
@@ -203,8 +417,11 @@ if (window.grist) {
     if (nextTableId) {
       lastTableId = nextTableId;
     }
+    if (message?.mappingsChange) {
+      latestMappings = null;
+    }
 
-    if (tableChanged || message?.dataChange) {
+    if (tableChanged || message?.dataChange || message?.mappingsChange) {
       void refreshFromSelectedBackingTable();
     }
   });

@@ -36,6 +36,12 @@ body.mode-recebimento {
   --accent-strong: #115e59;
 }
 
+body.is-resizing-columns,
+body.is-resizing-columns * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
 .app-shell {
   padding: 16px;
   display: flex;
@@ -134,6 +140,19 @@ h1 {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: 11px;
+  vertical-align: bottom;
+  overflow: visible;
+}
+
+.summary-table th .header-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 14px;
+}
+
+.summary-table th .month-code {
+  display: block;
 }
 
 .summary-table thead th .month-label {
@@ -143,6 +162,36 @@ h1 {
   text-transform: none;
   color: var(--text);
   margin-top: 2px;
+}
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: col-resize;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  right: 5px;
+  width: 2px;
+  height: 60%;
+  border-radius: 999px;
+  background: rgba(21, 94, 239, 0.18);
+  transition: background 120ms ease;
+}
+
+.summary-table thead th:hover .resize-handle::after,
+body.is-resizing-columns .resize-handle::after {
+  background: rgba(21, 94, 239, 0.48);
 }
 
 .summary-table tbody tr {
@@ -176,22 +225,16 @@ h1 {
 
 .summary-table .sticky-1 {
   left: var(--sticky-left-1);
-  min-width: 118px;
-  max-width: 118px;
   z-index: 5;
 }
 
 .summary-table .sticky-2 {
   left: var(--sticky-left-2);
-  min-width: 430px;
-  max-width: 430px;
   z-index: 4;
 }
 
 .summary-table .sticky-3 {
   left: var(--sticky-left-3);
-  min-width: 200px;
-  max-width: 200px;
   z-index: 3;
   box-shadow: 10px 0 16px rgba(18, 32, 51, 0.08);
 }
@@ -208,13 +251,8 @@ h1 {
   background: var(--row-bg);
 }
 
-.summary-table .meta-col {
-  min-width: 110px;
-  max-width: 140px;
-}
-
 .summary-table .month-col {
-  min-width: 108px;
+  min-width: 84px;
 }
 
 .summary-table tr.total-row {
