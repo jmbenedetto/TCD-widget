@@ -11,7 +11,6 @@ const META_COLUMNS = [
 ];
 
 const MONTH_FIELDS = Array.from({ length: 13 }, (_, index) => `m${String(index).padStart(2, '0')}`);
-const REQUESTED_COLUMNS = [...META_COLUMNS.map((column) => ({ name: column.id, optional: true })), ...MONTH_FIELDS.map((fieldId) => ({ name: fieldId, optional: true }))];
 const MODE_CONFIG = {
   emissao: {
     kicker: 'DKT inventory equation · emissão',
@@ -130,8 +129,42 @@ function buildDataRow(row, isTotal) {
   return tr;
 }
 
+function normalizeRecords(records) {
+  return (records || []).map((record) => record?.fields ?? record ?? {});
+}
+
+function tableDataToRows(table) {
+  const columnIds = Array.isArray(table?.column_metadata)
+    ? table.column_metadata.map((column) => column?.id).filter(Boolean)
+    : [];
+
+  if (!columnIds.length) {
+    return [];
+  }
+
+  const dataByColumn = {};
+  if (Array.isArray(table?.table_data)) {
+    columnIds.forEach((columnId, index) => {
+      dataByColumn[columnId] = Array.isArray(table.table_data[index]) ? table.table_data[index] : [];
+    });
+  } else if (table?.table_data && typeof table.table_data === 'object') {
+    columnIds.forEach((columnId) => {
+      dataByColumn[columnId] = Array.isArray(table.table_data[columnId]) ? table.table_data[columnId] : [];
+    });
+  }
+
+  const rowCount = Math.max(0, ...Object.values(dataByColumn).map((values) => values.length));
+  return Array.from({ length: rowCount }, (_, rowIndex) => {
+    const row = {};
+    columnIds.forEach((columnId) => {
+      row[columnId] = dataByColumn[columnId]?.[rowIndex];
+    });
+    return row;
+  });
+}
+
 function renderTable(records) {
-  const normalizedRecords = (records || []).map((record) => record?.fields ?? record ?? {});
+  const normalizedRecords = normalizeRecords(records);
   const labelRow = normalizedRecords.find((row) => !row.id_material);
   const totalRow = normalizedRecords.find((row) => String(row.id_material || '').trim().toUpperCase() === 'TOTAL GERAL');
   const itemRows = normalizedRecords.filter((row) => row !== labelRow && row !== totalRow);
@@ -139,7 +172,7 @@ function renderTable(records) {
   if (!itemRows.length) {
     matrixShellEl.hidden = true;
     summaryPillEl.hidden = true;
-    setStatus('No summary rows were returned by Grist.');
+    setStatus('No summary rows were returned by the selected Grist backing table.');
     return;
   }
 
@@ -169,11 +202,47 @@ function formatPillValue(value) {
   return String(value);
 }
 
+async function fetchSelectedBackingTableRows() {
+  const tableId = await window.grist.getSelectedTableId();
+  if (!tableId) {
+    throw new Error('No Grist backing table is currently selected.');
+  }
+
+  const table = await window.grist.docApi.fetchTable(tableId);
+  return tableDataToRows(table);
+}
+
+async function refreshFromSelectedBackingTable() {
+  try {
+    setStatus('Loading summary rows from the selected Grist backing table...');
+    const rows = await fetchSelectedBackingTableRows();
+    renderTable(rows);
+  } catch (error) {
+    matrixShellEl.hidden = true;
+    summaryPillEl.hidden = true;
+    const message = error instanceof Error ? error.message : String(error);
+    setStatus(`Failed to load the selected Grist backing table: ${message}`);
+    console.error(error);
+  }
+}
+
 if (window.grist) {
-  window.grist.ready({ requiredAccess: 'read table', columns: REQUESTED_COLUMNS });
-  window.grist.onRecords((records) => {
-    renderTable(records || []);
-  }, { includeColumns: 'all' });
+  window.grist.ready({ requiredAccess: 'read table' });
+
+  let lastTableId = null;
+  window.grist.on('message', (message) => {
+    const nextTableId = message?.tableId || null;
+    const tableChanged = Boolean(nextTableId && nextTableId !== lastTableId);
+    if (nextTableId) {
+      lastTableId = nextTableId;
+    }
+
+    if (tableChanged || message?.dataChange) {
+      void refreshFromSelectedBackingTable();
+    }
+  });
+
+  void refreshFromSelectedBackingTable();
 } else {
   setStatus('This widget must be opened inside Grist.');
 }
