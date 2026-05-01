@@ -176,7 +176,6 @@ function formatPillValue(value) {
 async function fetchSelectedBackingTableRows() {
   return await window.grist.fetchSelectedTable({
     format: 'rows',
-    includeColumns: 'all',
   });
 }
 
