@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6.3.0/dist/css/tabulator.min.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260501a" />
+    <link rel="stylesheet" href="./styles.css?v=20260501b" />
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <script src="https://unpkg.com/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
   </head>
@@ -19,9 +19,18 @@
           <h1 id="page-title">Planner matrix</h1>
           <p id="page-subtitle" class="subtitle">Waiting for direct Grist source rows.</p>
         </div>
-        <div class="header-pills">
-          <div id="source-pill" class="summary-pill source-pill">Direct source: <code>SaidaDados_ProjecaoEstoque</code></div>
-          <div id="summary-pill" class="summary-pill" hidden></div>
+        <div class="header-controls">
+          <div class="mode-toggle-card" aria-label="View mode toggle">
+            <span class="mode-toggle-label">View mode</span>
+            <div class="mode-toggle" role="group" aria-label="Emission or receipt mode">
+              <button type="button" class="mode-toggle-button" data-mode-toggle="emissao">Emissão</button>
+              <button type="button" class="mode-toggle-button" data-mode-toggle="recebimento">Recebimento</button>
+            </div>
+          </div>
+          <div class="header-pills">
+            <div id="source-pill" class="summary-pill source-pill">Direct source: <code>SaidaDados_ProjecaoEstoque</code></div>
+            <div id="summary-pill" class="summary-pill" hidden></div>
+          </div>
         </div>
       </header>
 
@@ -31,6 +40,7 @@
         <strong>V2 rules.</strong>
         <span>Reads directly from <code>SaidaDados_ProjecaoEstoque</code>.</span>
         <span>No backing/support summary table.</span>
+        <span>Same widget supports both emissão and recebimento with an in-page toggle.</span>
         <span>Tabulator provides frozen columns, resize, and horizontal scroll.</span>
       </section>
 
@@ -39,6 +49,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260501a"></script>
+    <script src="./app.js?v=20260501b"></script>
   </body>
 </html>

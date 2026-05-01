@@ -1,3 +1,4 @@
+const SOURCE_TABLE_ID = 'SaidaDados_ProjecaoEstoque';
 const MONTH_FIELDS = Array.from({ length: 13 }, (_, index) => `M${String(index).padStart(2, '0')}`);
 const REQUESTED_COLUMNS = [
   { name: 'id_material', optional: true },
@@ -34,34 +35,55 @@ const MODE_CONFIG = {
     kicker: 'DKT inventory equation · Tabulator V2 · emissão',
     title: 'Monthly order emission review',
     subtitle: 'Planner-facing matrix built directly from SaidaDados_ProjecaoEstoque. No backing/support summary table.',
+    toggleLabel: 'Emissão',
+    statusLabel: 'emissão',
     periodTransform: (row) => normalizePeriod(readMappedField(row, 'period')),
+    fieldsNote: 'id_material, periodo, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd.',
   },
   recebimento: {
     kicker: 'DKT inventory equation · Tabulator V2 · recebimento',
     title: 'Monthly order arrival review',
     subtitle: 'Planner-facing matrix derived from direct-source projection rows, shifted by lead time.',
+    toggleLabel: 'Recebimento',
+    statusLabel: 'recebimento',
     periodTransform: (row) => shiftPeriod(normalizePeriod(readMappedField(row, 'period')), toInteger(readMappedField(row, 'leadTime'))),
+    fieldsNote: 'id_material, periodo, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd, lead_time_meses.',
   },
 };
 const params = new URLSearchParams(window.location.search);
-const mode = params.get('mode') === 'recebimento' ? 'recebimento' : 'emissao';
-const modeConfig = MODE_CONFIG[mode];
+const initialMode = params.get('mode') === 'recebimento' ? 'recebimento' : 'emissao';
+let currentMode = initialMode;
 const statusEl = document.getElementById('status');
 const tableShellEl = document.getElementById('table-shell');
 const summaryPillEl = document.getElementById('summary-pill');
 const titleEl = document.getElementById('page-title');
 const subtitleEl = document.getElementById('page-subtitle');
 const kickerEl = document.getElementById('mode-kicker');
+const modeToggleButtons = Array.from(document.querySelectorAll('[data-mode-toggle]'));
 const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const decimalFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 let table = null;
 let currentTableId = null;
 let latestRows = [];
-let latestMappings = null;
+let latestSourceLabel = null;
 
-kickerEl.textContent = modeConfig.kicker;
-titleEl.textContent = modeConfig.title;
-subtitleEl.textContent = modeConfig.subtitle;
+applyModeUi();
+
+function getModeConfig() {
+  return MODE_CONFIG[currentMode];
+}
+
+function applyModeUi() {
+  const modeConfig = getModeConfig();
+  kickerEl.textContent = modeConfig.kicker;
+  titleEl.textContent = modeConfig.title;
+  subtitleEl.textContent = modeConfig.subtitle;
+  for (const button of modeToggleButtons) {
+    const isActive = button.dataset.modeToggle === currentMode;
+    button.classList.toggle('is-active', isActive);
+    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  }
+}
 
 function setStatus(message) {
   statusEl.textContent = message;
@@ -201,6 +223,7 @@ function formatFlag(value) {
 }
 
 function buildDisplayRows(rows) {
+  const modeConfig = getModeConfig();
   const groups = new Map();
   const monthLabels = Object.fromEntries(MONTH_FIELDS.map((fieldId) => [fieldId, fieldId]));
   let skippedRows = 0;
@@ -375,19 +398,21 @@ function ensureTable(columns) {
 
 async function renderFromRows(rows, sourceLabel) {
   latestRows = rows;
+  latestSourceLabel = sourceLabel;
+  const modeConfig = getModeConfig();
   const { displayRows, skuCount, skippedRows, totalUnits, monthLabels } = buildDisplayRows(rows);
   ensureTable(buildColumns(monthLabels));
   await table.replaceData(displayRows);
   tableShellEl.hidden = false;
   summaryPillEl.hidden = false;
-  summaryPillEl.textContent = `${numberFormatter.format(skuCount)} SKU rows · ${numberFormatter.format(totalUnits)} total units`;
+  summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${numberFormatter.format(skuCount)} SKU rows · ${numberFormatter.format(totalUnits)} total units`;
 
-  const tableLabel = currentTableId || 'selected table';
+  const tableLabel = currentTableId || SOURCE_TABLE_ID;
   setStatus(
     `Loaded ${numberFormatter.format(rows.length)} direct-source rows from ${tableLabel} via ${sourceLabel}. ` +
-      `Rendered ${numberFormatter.format(skuCount)} planner rows for mode=${mode}. ` +
+      `Rendered ${numberFormatter.format(skuCount)} planner rows for mode=${currentMode}. ` +
       `Skipped ${numberFormatter.format(skippedRows)} rows outside the visible M00-M12 window. ` +
-      `Fields used: id_material, periodo, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd${mode === 'recebimento' ? ', lead_time_meses' : ''}.`
+      `Fields used: ${modeConfig.fieldsNote}`
   );
 }
 
@@ -408,26 +433,57 @@ async function fetchRowsFromSelectedTable() {
   return rowsFromTablePayload(payload);
 }
 
+function persistModeInUrl() {
+  const nextParams = new URLSearchParams(window.location.search);
+  nextParams.set('mode', currentMode);
+  const nextUrl = `${window.location.pathname}?${nextParams.toString()}${window.location.hash || ''}`;
+  window.history.replaceState({}, '', nextUrl);
+}
+
+async function applyMode(nextMode) {
+  if (!MODE_CONFIG[nextMode]) {
+    return;
+  }
+  currentMode = nextMode;
+  applyModeUi();
+  persistModeInUrl();
+  if (latestRows.length) {
+    await renderFromRows(latestRows, latestSourceLabel || 'cached direct-source rows');
+    return;
+  }
+  setStatus(`Waiting for direct-source rows. Current mode=${currentMode}.`);
+}
+
 async function refreshRows(reason) {
   try {
     setStatus(`Loading direct-source rows (${reason})...`);
+
+    if (currentTableId === SOURCE_TABLE_ID && latestRows.length) {
+      await renderFromRows(latestRows, 'grist.onRecords');
+      return;
+    }
+
+    const fromSourceTable = await fetchRowsFromDocApi(SOURCE_TABLE_ID);
+    if (fromSourceTable.length) {
+      currentTableId = SOURCE_TABLE_ID;
+      await renderFromRows(fromSourceTable, 'grist.docApi.fetchTable(source table)');
+      return;
+    }
+
     const fromSelectedTable = await fetchRowsFromSelectedTable();
     if (fromSelectedTable.length) {
       await renderFromRows(fromSelectedTable, 'grist.fetchSelectedTable');
       return;
     }
-    const fromDocApi = await fetchRowsFromDocApi(currentTableId);
-    if (fromDocApi.length) {
-      await renderFromRows(fromDocApi, 'grist.docApi.fetchTable');
-      return;
-    }
+
     if (latestRows.length) {
       await renderFromRows(latestRows, 'cached onRecords payload');
       return;
     }
+
     tableShellEl.hidden = true;
     summaryPillEl.hidden = true;
-    setStatus('No rows were returned from the bound Grist table.');
+    setStatus('No rows were returned from the direct source table.');
   } catch (error) {
     tableShellEl.hidden = true;
     summaryPillEl.hidden = true;
@@ -437,11 +493,16 @@ async function refreshRows(reason) {
   }
 }
 
+for (const button of modeToggleButtons) {
+  button.addEventListener('click', () => {
+    void applyMode(button.dataset.modeToggle);
+  });
+}
+
 if (window.grist) {
   window.grist.ready({ requiredAccess: 'read table', columns: REQUESTED_COLUMNS });
 
-  window.grist.onRecords((records, mappings) => {
-    latestMappings = mappings || latestMappings;
+  window.grist.onRecords((records) => {
     latestRows = Array.isArray(records) ? records.map(normalizeRow) : [];
     void renderFromRows(latestRows, 'grist.onRecords');
   }, { format: 'rows' });
