@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inventory policy generator</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">DKT inventory policy · V01</p>
+        <h1>Generate detailed policy rows</h1>
+        <p class="subtitle">
+          Select one row in <code>Entrada_Politicas</code>, then generate the detailed browse rows in
+          <code>SaidaDados_Politica</code>.
+        </p>
+      </header>
+
+      <section class="panel policy-panel">
+        <div class="panel-head">
+          <h2>Selected policy</h2>
+          <span id="status-badge" class="badge badge-idle">Idle</span>
+        </div>
+        <dl id="policy-details" class="policy-details">
+          <div><dt>Policy id</dt><dd id="policy-id">—</dd></div>
+          <div><dt>Name</dt><dd id="policy-name">—</dd></div>
+          <div><dt>Type</dt><dd id="policy-type">—</dd></div>
+          <div><dt>Base month</dt><dd id="policy-month">—</dd></div>
+          <div><dt>Generation status</dt><dd id="policy-generation-status">—</dd></div>
+          <div><dt>Generated rows</dt><dd id="policy-generated-rows">—</dd></div>
+        </dl>
+      </section>
+
+      <section class="panel action-panel">
+        <div class="panel-head">
+          <h2>Action</h2>
+        </div>
+        <p class="action-copy">
+          This widget asks for <code>full</code> Grist access so it can create persisted rows directly in the document.
+          No n8n or external workflow runner is required.
+        </p>
+        <button id="generate-button" class="primary-button" type="button" disabled>
+          Generate detail rows
+        </button>
+        <p id="status-text" class="status-text">Waiting for a selected policy row.</p>
+      </section>
+
+      <section class="panel preview-panel">
+        <div class="panel-head">
+          <h2>Generation preview</h2>
+        </div>
+        <ul class="preview-list">
+          <li><span>Products in scope</span><strong id="preview-products">—</strong></li>
+          <li><span>Planning buckets</span><strong id="preview-buckets">13 (M00-M12)</strong></li>
+          <li><span>Rows to create</span><strong id="preview-rows">—</strong></li>
+        </ul>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
