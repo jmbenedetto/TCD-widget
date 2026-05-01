@@ -145,12 +145,20 @@ h1 {
   margin-top: 2px;
 }
 
-.summary-table tbody tr:nth-child(even) td {
-  background: #fbfcfe;
+.summary-table tbody tr {
+  --row-bg: var(--surface);
 }
 
-.summary-table tbody tr:hover td {
-  background: #f4f8ff;
+.summary-table tbody tr:nth-child(even) {
+  --row-bg: #fbfcfe;
+}
+
+.summary-table tbody tr:hover {
+  --row-bg: #f4f8ff;
+}
+
+.summary-table tbody td {
+  background: var(--row-bg);
 }
 
 .summary-table td.numeric,
@@ -163,25 +171,29 @@ h1 {
 .summary-table .sticky-2,
 .summary-table .sticky-3 {
   position: sticky;
-  z-index: 4;
+  background: var(--surface);
 }
 
 .summary-table .sticky-1 {
   left: var(--sticky-left-1);
   min-width: 118px;
   max-width: 118px;
+  z-index: 5;
 }
 
 .summary-table .sticky-2 {
   left: var(--sticky-left-2);
   min-width: 430px;
   max-width: 430px;
+  z-index: 4;
 }
 
 .summary-table .sticky-3 {
   left: var(--sticky-left-3);
   min-width: 200px;
   max-width: 200px;
+  z-index: 3;
+  box-shadow: 10px 0 16px rgba(18, 32, 51, 0.08);
 }
 
 .summary-table thead .sticky-1,
@@ -193,7 +205,7 @@ h1 {
 .summary-table tbody .sticky-1,
 .summary-table tbody .sticky-2,
 .summary-table tbody .sticky-3 {
-  background: inherit;
+  background: var(--row-bg);
 }
 
 .summary-table .meta-col {
@@ -205,11 +217,15 @@ h1 {
   min-width: 108px;
 }
 
+.summary-table tr.total-row {
+  --row-bg: linear-gradient(180deg, var(--accent-soft), #ffffff);
+}
+
 .summary-table tr.total-row td {
   position: sticky;
   bottom: 0;
   z-index: 5;
-  background: linear-gradient(180deg, var(--accent-soft), #ffffff);
+  background: var(--row-bg);
   font-weight: 700;
   box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.04);
 }
