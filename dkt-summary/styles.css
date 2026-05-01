@@ -14,7 +14,7 @@
   --shadow: 0 10px 24px rgba(18, 32, 51, 0.08);
   --sticky-left-1: 0px;
   --sticky-left-2: 118px;
-  --sticky-left-3: 420px;
+  --sticky-left-3: 548px;
 }
 
 * {
@@ -119,6 +119,8 @@ h1 {
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: var(--surface);
   font-size: 13px;
 }
@@ -172,14 +174,14 @@ h1 {
 
 .summary-table .sticky-2 {
   left: var(--sticky-left-2);
-  min-width: 302px;
-  max-width: 302px;
+  min-width: 430px;
+  max-width: 430px;
 }
 
 .summary-table .sticky-3 {
   left: var(--sticky-left-3);
-  min-width: 170px;
-  max-width: 170px;
+  min-width: 200px;
+  max-width: 200px;
 }
 
 .summary-table thead .sticky-1,
@@ -196,6 +198,7 @@ h1 {
 
 .summary-table .meta-col {
   min-width: 110px;
+  max-width: 140px;
 }
 
 .summary-table .month-col {
