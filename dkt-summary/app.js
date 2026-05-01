@@ -11,6 +11,7 @@ const META_COLUMNS = [
 ];
 
 const MONTH_FIELDS = Array.from({ length: 13 }, (_, index) => `m${String(index).padStart(2, '0')}`);
+const REQUESTED_COLUMNS = [...META_COLUMNS.map((column) => ({ name: column.id, optional: true })), ...MONTH_FIELDS.map((fieldId) => ({ name: fieldId, optional: true }))];
 const MODE_CONFIG = {
   emissao: {
     kicker: 'DKT inventory equation · emissão',
@@ -173,27 +174,10 @@ function formatPillValue(value) {
 }
 
 async function fetchSelectedBackingTableRows() {
-  const tableId = await window.grist.getSelectedTableId();
-  if (!tableId) {
-    throw new Error('No Grist backing table is currently selected.');
-  }
-
-  const { token, baseUrl } = await window.grist.getAccessToken({ readOnly: true });
-  const response = await fetch(`${baseUrl}/tables/${encodeURIComponent(tableId)}/records`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  return await window.grist.fetchSelectedTable({
+    format: 'rows',
+    includeColumns: 'all',
   });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} while reading ${tableId}`);
-  }
-
-  const payload = await response.json();
-  return (payload.records || []).map((record) => ({
-    id: record.id,
-    ...(record.fields || {}),
-  }));
 }
 
 async function refreshFromSelectedBackingTable() {
@@ -211,7 +195,7 @@ async function refreshFromSelectedBackingTable() {
 }
 
 if (window.grist) {
-  window.grist.ready({ requiredAccess: 'read table' });
+  window.grist.ready({ requiredAccess: 'read table', columns: REQUESTED_COLUMNS });
 
   let lastTableId = null;
   window.grist.on('message', (message) => {
