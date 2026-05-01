@@ -133,36 +133,6 @@ function normalizeRecords(records) {
   return (records || []).map((record) => record?.fields ?? record ?? {});
 }
 
-function tableDataToRows(table) {
-  const columnIds = Array.isArray(table?.column_metadata)
-    ? table.column_metadata.map((column) => column?.id).filter(Boolean)
-    : [];
-
-  if (!columnIds.length) {
-    return [];
-  }
-
-  const dataByColumn = {};
-  if (Array.isArray(table?.table_data)) {
-    columnIds.forEach((columnId, index) => {
-      dataByColumn[columnId] = Array.isArray(table.table_data[index]) ? table.table_data[index] : [];
-    });
-  } else if (table?.table_data && typeof table.table_data === 'object') {
-    columnIds.forEach((columnId) => {
-      dataByColumn[columnId] = Array.isArray(table.table_data[columnId]) ? table.table_data[columnId] : [];
-    });
-  }
-
-  const rowCount = Math.max(0, ...Object.values(dataByColumn).map((values) => values.length));
-  return Array.from({ length: rowCount }, (_, rowIndex) => {
-    const row = {};
-    columnIds.forEach((columnId) => {
-      row[columnId] = dataByColumn[columnId]?.[rowIndex];
-    });
-    return row;
-  });
-}
-
 function renderTable(records) {
   const normalizedRecords = normalizeRecords(records);
   const labelRow = normalizedRecords.find((row) => !row.id_material);
@@ -208,8 +178,22 @@ async function fetchSelectedBackingTableRows() {
     throw new Error('No Grist backing table is currently selected.');
   }
 
-  const table = await window.grist.docApi.fetchTable(tableId);
-  return tableDataToRows(table);
+  const { token, baseUrl } = await window.grist.getAccessToken({ readOnly: true });
+  const response = await fetch(`${baseUrl}/tables/${encodeURIComponent(tableId)}/records`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} while reading ${tableId}`);
+  }
+
+  const payload = await response.json();
+  return (payload.records || []).map((record) => ({
+    id: record.id,
+    ...(record.fields || {}),
+  }));
 }
 
 async function refreshFromSelectedBackingTable() {
