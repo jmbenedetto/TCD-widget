@@ -68,9 +68,9 @@ let currentTableId = null;
 let latestRows = [];
 let latestSourceLabel = null;
 
-notesEl.hidden = !debugMode;
-sourcePillEl.hidden = !debugMode;
-statusEl.hidden = !debugMode;
+setElementVisible(notesEl, debugMode);
+setElementVisible(sourcePillEl, debugMode);
+setElementVisible(statusEl, debugMode);
 applyModeUi();
 
 function getModeConfig() {
@@ -89,9 +89,17 @@ function applyModeUi() {
   }
 }
 
+function setElementVisible(element, visible) {
+  if (!element) {
+    return;
+  }
+  element.hidden = !visible;
+  element.classList.toggle('is-hidden', !visible);
+}
+
 function setStatus(message, { visible = debugMode } = {}) {
   statusEl.textContent = message;
-  statusEl.hidden = !visible;
+  setElementVisible(statusEl, visible);
 }
 
 function getDocApi() {
@@ -408,8 +416,8 @@ async function renderFromRows(rows, sourceLabel) {
   const { displayRows, skuCount, skippedRows, totalUnits, monthLabels } = buildDisplayRows(rows);
   ensureTable(buildColumns(monthLabels));
   await table.replaceData(displayRows);
-  tableShellEl.hidden = false;
-  summaryPillEl.hidden = false;
+  setElementVisible(tableShellEl, true);
+  setElementVisible(summaryPillEl, true);
   summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${numberFormatter.format(skuCount)} SKUs · ${numberFormatter.format(totalUnits)} un.`;
   setStatus(
     `Fonte: ${currentTableId || SOURCE_TABLE_ID}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(skuCount)} SKUs renderizados, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12. Campos usados: ${modeConfig.fieldsNote}`,
@@ -482,12 +490,12 @@ async function refreshRows(reason) {
       return;
     }
 
-    tableShellEl.hidden = true;
-    summaryPillEl.hidden = true;
+    setElementVisible(tableShellEl, false);
+    setElementVisible(summaryPillEl, false);
     setStatus('Nenhuma linha foi retornada pela fonte de dados.', { visible: true });
   } catch (error) {
-    tableShellEl.hidden = true;
-    summaryPillEl.hidden = true;
+    setElementVisible(tableShellEl, false);
+    setElementVisible(summaryPillEl, false);
     const message = error instanceof Error ? error.message : String(error);
     setStatus(`Não foi possível carregar os dados: ${message}`, { visible: true });
     console.error(error);
