@@ -62,6 +62,19 @@ function computePreview(){
 function renderPreview(p){
   el.finalName.textContent = p?.nome || '—'; el.versionKey.textContent = p?.versao_plano || '—'; el.productCount.textContent = p ? p.products.length : '—'; el.periodCount.textContent = p ? p.periods.length : '—'; el.supportCount.textContent = p ? p.supportCount : '—'; el.outputCount.textContent = p ? p.supportCount : '—'; el.create.disabled = !p || !p.supportCount || state.running;
 }
+function installNavigationWarning(){
+  window.addEventListener('beforeunload', (event) => {
+    if (!state.running) return;
+    event.preventDefault();
+    event.returnValue = 'Plan version creation is still running. Leaving now may create a partial plan.';
+    return event.returnValue;
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (state.running && document.hidden) {
+      setStatus('Creation is still running. Keep this widget open until the success message appears.');
+    }
+  });
+}
 async function refreshTables(){
   const [locations, plans, products, periods, supportRows] = await Promise.all([
     fetchRows('Entrada_Locais'), fetchRows('Entrada_VersoesPlano'), fetchRows('Entrada_Produtos'), fetchRows('Entrada_Periodo'), fetchRows('Apoio_ProjecaoEstoque')
@@ -99,7 +112,7 @@ async function preview(){
 }
 async function createPlan(){
   if(state.running) return;
-  state.running = true; el.create.disabled = true; setBadge('running','Creating'); setStatus('Creating inactive plan version…');
+  state.running = true; el.create.disabled = true; setBadge('running','Creating'); setStatus('Creating inactive plan version… Keep this widget open until completion. Leaving now may create a partial plan.');
   try{
     const p = state.preview || computePreview();
     await apply([['AddRecord','Entrada_VersoesPlano',null,{nome:p.nome,ciclo:p.ciclo,local:p.local,flag_ativo:false,criado_em:new Date().toISOString(),criado_por:'plan-version-generator',status_geracao:'generating',qtd_linhas_geradas:0,erro_geracao:''}]]);
@@ -117,4 +130,5 @@ async function createPlan(){
 }
 
 el.preview.addEventListener('click', preview); el.create.addEventListener('click', createPlan); [el.cycle, el.location, el.name].forEach(node => node.addEventListener('input', () => preview().catch(()=>{})));
+installNavigationWarning();
 (async function init(){ try{ if(window.grist?.ready) window.grist.ready({requiredAccess:'full'}); await refreshTables(); await preview(); } catch(err){ setBadge('error','Error'); setStatus(err.message || String(err)); } })();
