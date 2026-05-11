@@ -2,11 +2,12 @@
   color-scheme: light;
   --bg: #f4f7fb;
   --card: #ffffff;
-  --card-border: #d6e1f0;
-  --ink: #17324d;
-  --muted: #5f748c;
-  --accent: #2f6fed;
-  --accent-soft: rgba(47, 111, 237, 0.1);
+  --card-border: #ead2d7;
+  --ink: #2d1b22;
+  --muted: #6f5c63;
+  --accent: #b83a4b;
+  --accent-strong: #8f2434;
+  --accent-soft: rgba(184, 58, 75, 0.11);
   --ok: #18804b;
   --warn: #b35c00;
   --shadow: 0 16px 32px rgba(15, 44, 76, 0.08);
@@ -19,7 +20,7 @@
 body {
   margin: 0;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+  background: linear-gradient(180deg, #fff8f9 0%, var(--bg) 100%);
   color: var(--ink);
 }
 
@@ -107,7 +108,7 @@ h1 {
   padding: 8px 10px;
   border: 1px solid var(--card-border);
   border-radius: 12px;
-  background: #f8fbff;
+  background: #fff7f8;
 }
 
 .mode-toggle-label {
@@ -119,7 +120,7 @@ h1 {
   gap: 4px;
   padding: 4px;
   border-radius: 999px;
-  background: #eaf1fb;
+  background: #f7e7ea;
 }
 
 .mode-toggle-button {
@@ -140,7 +141,7 @@ h1 {
 .mode-toggle-button.is-active {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 10px 18px rgba(47, 111, 237, 0.2);
+  box-shadow: 0 10px 18px rgba(184, 58, 75, 0.2);
 }
 
 .header-pills {
@@ -165,7 +166,7 @@ h1 {
 }
 
 .source-pill {
-  background: #eef5ff;
+  background: #fff0f2;
 }
 
 .status-card,
@@ -200,7 +201,7 @@ h1 {
 
 .tabulator .tabulator-header {
   border-bottom: 1px solid var(--card-border);
-  background: #f6f9fd;
+  background: #fff4f5;
 }
 
 .tabulator .tabulator-header .tabulator-col {
@@ -229,7 +230,7 @@ h1 {
 }
 
 .tabulator .tabulator-header .tabulator-col.tabulator-frozen {
-  background: #eef4fb;
+  background: #fff0f2;
 }
 
 .tabulator-row {
@@ -237,17 +238,18 @@ h1 {
 }
 
 .tabulator-row:nth-child(even) {
-  background: #fbfdff;
+  background: #fffafb;
 }
 
 .tabulator-row.tabulator-selected {
-  background: #eef5ff;
+  background: #fdecef;
 }
 
 .tabulator-row.total-row,
 .tabulator-row.total-row:nth-child(even) {
-  background: #eaf2ff;
-  font-weight: 700;
+  background: #f9dfe4;
+  color: var(--accent-strong);
+  font-weight: 800;
 }
 
 .tabulator-cell.frozen-meta {

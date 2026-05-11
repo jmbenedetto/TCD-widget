@@ -12,6 +12,7 @@ const REQUESTED_COLUMNS = [
   { name: 'lote', optional: true },
   { name: 'flag_validate', optional: true },
   { name: 'proposta_pedido_qtd', optional: true },
+  { name: 'vlr_custo_proposta_pedido_qtd', optional: true },
   { name: 'lead_time_meses', optional: true },
   { name: 'ultimo_periodo_possivel_pedido', optional: true },
 ];
@@ -27,6 +28,7 @@ const SOURCE_FIELD_MAP = {
   lot: ['lote'],
   validate: ['flag_validate'],
   proposalQty: ['proposta_pedido_qtd'],
+  proposalCost: ['vlr_custo_proposta_pedido_qtd'],
   leadTime: ['lead_time_meses'],
   latestOrderPeriod: ['ultimo_periodo_possivel_pedido'],
 };
@@ -36,22 +38,28 @@ const MODE_CONFIG = {
     title: 'Pedidos propostos',
     subtitle: 'Revise as recomendações por período de emissão.',
     toggleLabel: 'Emissão',
-    periodTransform: (row) => normalizePeriod(readMappedField(row, 'period')),
-    fieldsNote: 'id_material, periodo, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd.',
+    periodTransform: (row) => normalizePeriod(readMappedField(row, 'latestOrderPeriod')),
+    fieldsNote: 'id_material, ultimo_periodo_possivel_pedido, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd, vlr_custo_proposta_pedido_qtd.',
   },
   recebimento: {
     kicker: 'Planejamento de suprimentos',
     title: 'Pedidos propostos',
     subtitle: 'Revise as recomendações por período de recebimento.',
     toggleLabel: 'Recebimento',
-    periodTransform: (row) => shiftPeriod(normalizePeriod(readMappedField(row, 'period')), toInteger(readMappedField(row, 'leadTime'))),
-    fieldsNote: 'id_material, periodo, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd, lead_time_meses.',
+    periodTransform: (row) => normalizePeriod(readMappedField(row, 'period')),
+    fieldsNote: 'id_material, periodo, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd, vlr_custo_proposta_pedido_qtd.',
   },
 };
 const params = new URLSearchParams(window.location.search);
 const debugMode = params.get('debug') === '1';
 const initialMode = params.get('mode') === 'recebimento' ? 'recebimento' : 'emissao';
 let currentMode = initialMode;
+const initialBasis = params.get('basis') === 'cost' ? 'cost' : 'units';
+let currentBasis = initialBasis;
+const MEASURE_BASIS_CONFIG = {
+  units: { label: 'Unidades', shortLabel: 'un.', logicalField: 'proposalQty' },
+  cost: { label: 'Custo', shortLabel: 'R$', logicalField: 'proposalCost' },
+};
 const statusEl = document.getElementById('status');
 const notesEl = document.getElementById('notes-card');
 const tableShellEl = document.getElementById('table-shell');
@@ -61,8 +69,10 @@ const titleEl = document.getElementById('page-title');
 const subtitleEl = document.getElementById('page-subtitle');
 const kickerEl = document.getElementById('mode-kicker');
 const modeToggleButtons = Array.from(document.querySelectorAll('[data-mode-toggle]'));
+const basisToggleButtons = Array.from(document.querySelectorAll('[data-basis-toggle]'));
 const numberFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 const decimalFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 let table = null;
 let currentTableId = null;
 let latestRows = [];
@@ -77,13 +87,23 @@ function getModeConfig() {
   return MODE_CONFIG[currentMode];
 }
 
+function getBasisConfig() {
+  return MEASURE_BASIS_CONFIG[currentBasis];
+}
+
 function applyModeUi() {
   const modeConfig = getModeConfig();
+  const basisConfig = getBasisConfig();
   kickerEl.textContent = modeConfig.kicker;
-  titleEl.textContent = modeConfig.title;
-  subtitleEl.textContent = modeConfig.subtitle;
+  titleEl.textContent = `${modeConfig.title} · ${basisConfig.label}`;
+  subtitleEl.textContent = `${modeConfig.subtitle} Base: ${basisConfig.label.toLowerCase()}.`;
   for (const button of modeToggleButtons) {
     const isActive = button.dataset.modeToggle === currentMode;
+    button.classList.toggle('is-active', isActive);
+    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  }
+  for (const button of basisToggleButtons) {
+    const isActive = button.dataset.basisToggle === currentBasis;
     button.classList.toggle('is-active', isActive);
     button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
   }
@@ -226,6 +246,13 @@ function formatNumeric(value) {
   return decimalFormatter.format(numeric);
 }
 
+function formatMeasure(value) {
+  if (currentBasis === 'cost') {
+    return currencyFormatter.format(toNumber(value));
+  }
+  return formatNumeric(value);
+}
+
 function formatFlag(value) {
   if (value === null || value === undefined || value === '') {
     return '<span class="muted">—</span>';
@@ -258,11 +285,12 @@ function buildDisplayRows(rows) {
     }
 
     const rawProposalQty = toNumber(readMappedField(row, 'proposalQty'));
-    const isActionableProposal = rawProposalQty <= 0 || hasLatestOrderPeriod(row);
-    const proposalQty = isActionableProposal ? rawProposalQty : 0;
+    const measureValue = rawProposalQty > 0 ? toNumber(readMappedField(row, getBasisConfig().logicalField)) : 0;
+    const isActionableProposal = rawProposalQty > 0;
+    const bucketValue = isActionableProposal ? measureValue : 0;
     if (!isActionableProposal) {
       excludedProposalRows += 1;
-      excludedProposalUnits += rawProposalQty;
+      excludedProposalUnits += Math.max(rawProposalQty, 0);
     }
 
     const monthLabel = readMappedField(row, 'monthLabel');
@@ -289,8 +317,8 @@ function buildDisplayRows(rows) {
     }
 
     const grouped = groups.get(rowKey);
-    grouped[period] += proposalQty;
-    grouped.total += proposalQty;
+    grouped[period] += bucketValue;
+    grouped.total += bucketValue;
     grouped.flag_validate = Math.max(grouped.flag_validate, toInteger(readMappedField(row, 'validate')));
     if (!grouped.descricao && readMappedField(row, 'description')) {
       grouped.descricao = readMappedField(row, 'description');
@@ -386,7 +414,9 @@ function updateSummaryFromVisibleRows(rows) {
   const modeConfig = getModeConfig();
   const visibleRows = (rows || []).filter((row) => row && row._rowType !== 'total');
   const visibleUnits = visibleRows.reduce((sum, row) => sum + toNumber(row.total), 0);
-  summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${numberFormatter.format(visibleRows.length)} SKUs · ${numberFormatter.format(visibleUnits)} un.`;
+  const basisConfig = getBasisConfig();
+  const formattedTotal = currentBasis === 'cost' ? currencyFormatter.format(visibleUnits) : `${numberFormatter.format(visibleUnits)} ${basisConfig.shortLabel}`;
+  summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${basisConfig.label} · ${numberFormatter.format(visibleRows.length)} SKUs · ${formattedTotal}`;
 }
 
 function refreshVisibleSummaryFromTable() {
@@ -436,7 +466,7 @@ function buildColumns(monthLabels) {
     { title: 'Lote', field: 'lote', width: 96, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()), ...numericHeaderFilter() },
     { title: 'Validar', field: 'flag_validate', width: 96, hozAlign: 'center', resizable: true, formatter: (cell) => formatFlag(cell.getValue()), ...listHeaderFilter() },
     { title: 'Últ. pedido', field: 'latest_order_period', width: 120, hozAlign: 'center', resizable: true, formatter: (cell) => escapeHtml(cell.getValue() || '—'), ...listHeaderFilter() },
-    { title: 'Total', field: 'total', width: 120, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatNumeric(cell.getValue()), ...numericHeaderFilter() },
+    { title: `Total (${getBasisConfig().shortLabel})`, field: 'total', width: 130, hozAlign: 'right', resizable: true, cssClass: 'numeric-cell', formatter: (cell) => formatMeasure(cell.getValue()), ...numericHeaderFilter() },
   ];
 
   const monthColumns = MONTH_FIELDS.map((fieldId) => ({
@@ -448,7 +478,7 @@ function buildColumns(monthLabels) {
     hozAlign: 'right',
     cssClass: 'numeric-cell',
     headerSort: false,
-    formatter: (cell) => formatNumeric(cell.getValue()),
+    formatter: (cell) => formatMeasure(cell.getValue()),
     ...numericHeaderFilter(),
   }));
 
@@ -501,7 +531,7 @@ async function renderFromRows(rows, sourceLabel) {
   setElementVisible(summaryPillEl, true);
   updateSummaryFromVisibleRows(displayRows);
   setStatus(
-    `Fonte: ${currentTableId || SOURCE_TABLE_ID}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(skuCount)} SKUs renderizados, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12, ${numberFormatter.format(excludedProposalRows)} linhas de proposta excluídas por não terem último período possível de pedido, total excluído de ${numberFormatter.format(excludedProposalUnits)} un. Campos usados: ${modeConfig.fieldsNote}`,
+    `Fonte: ${currentTableId || SOURCE_TABLE_ID}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(skuCount)} SKUs renderizados, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12, ${numberFormatter.format(excludedProposalRows)} linhas sem proposta positiva excluídas, total excluído de ${numberFormatter.format(excludedProposalUnits)} un. Campos usados: ${modeConfig.fieldsNote}`,
     { visible: debugMode }
   );
 }
@@ -523,9 +553,10 @@ async function fetchRowsFromSelectedTable() {
   return rowsFromTablePayload(payload);
 }
 
-function persistModeInUrl() {
+function persistStateInUrl() {
   const nextParams = new URLSearchParams(window.location.search);
   nextParams.set('mode', currentMode);
+  nextParams.set('basis', currentBasis);
   const nextUrl = `${window.location.pathname}?${nextParams.toString()}${window.location.hash || ''}`;
   window.history.replaceState({}, '', nextUrl);
 }
@@ -536,12 +567,26 @@ async function applyMode(nextMode) {
   }
   currentMode = nextMode;
   applyModeUi();
-  persistModeInUrl();
+  persistStateInUrl();
   if (latestRows.length) {
     await renderFromRows(latestRows, latestSourceLabel || 'cached direct-source rows');
     return;
   }
   setStatus(`Carregando visão de ${MODE_CONFIG[nextMode].toggleLabel.toLowerCase()}...`, { visible: debugMode });
+}
+
+async function applyBasis(nextBasis) {
+  if (!MEASURE_BASIS_CONFIG[nextBasis]) {
+    return;
+  }
+  currentBasis = nextBasis;
+  applyModeUi();
+  persistStateInUrl();
+  if (latestRows.length) {
+    await renderFromRows(latestRows, latestSourceLabel || 'cached direct-source rows');
+    return;
+  }
+  setStatus(`Carregando base ${MEASURE_BASIS_CONFIG[nextBasis].label.toLowerCase()}...`, { visible: debugMode });
 }
 
 async function refreshRows(reason) {
@@ -586,6 +631,12 @@ async function refreshRows(reason) {
 for (const button of modeToggleButtons) {
   button.addEventListener('click', () => {
     void applyMode(button.dataset.modeToggle);
+  });
+}
+
+for (const button of basisToggleButtons) {
+  button.addEventListener('click', () => {
+    void applyBasis(button.dataset.basisToggle);
   });
 }
 
