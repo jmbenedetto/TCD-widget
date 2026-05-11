@@ -1,4 +1,6 @@
 const SOURCE_TABLE_ID = 'SaidaDados_ProjecaoEstoque';
+const PLAN_VERSION_TABLE_ID = 'Entrada_VersoesPlano';
+const PLAN_VERSION_STORAGE_KEY = 'dkt-summary-v2:selected-plan-version';
 const MONTH_FIELDS = Array.from({ length: 13 }, (_, index) => `M${String(index).padStart(2, '0')}`);
 const REQUESTED_COLUMNS = [
   { name: 'id_material', optional: true },
@@ -15,6 +17,8 @@ const REQUESTED_COLUMNS = [
   { name: 'vlr_custo_proposta_pedido_qtd', optional: true },
   { name: 'lead_time_meses', optional: true },
   { name: 'ultimo_periodo_possivel_pedido', optional: true },
+  { name: 'versao_plano', optional: true },
+  { name: 'ciclo', optional: true },
 ];
 const SOURCE_FIELD_MAP = {
   sku: ['id_material'],
@@ -31,6 +35,8 @@ const SOURCE_FIELD_MAP = {
   proposalCost: ['vlr_custo_proposta_pedido_qtd'],
   leadTime: ['lead_time_meses'],
   latestOrderPeriod: ['ultimo_periodo_possivel_pedido'],
+  planVersion: ['versao_plano'],
+  cycle: ['ciclo'],
 };
 const MODE_CONFIG = {
   emissao: {
@@ -65,6 +71,7 @@ const notesEl = document.getElementById('notes-card');
 const tableShellEl = document.getElementById('table-shell');
 const sourcePillEl = document.getElementById('source-pill');
 const summaryPillEl = document.getElementById('summary-pill');
+const planVersionSelectEl = document.getElementById('plan-version-select');
 const titleEl = document.getElementById('page-title');
 const subtitleEl = document.getElementById('page-subtitle');
 const kickerEl = document.getElementById('mode-kicker');
@@ -77,6 +84,8 @@ let table = null;
 let currentTableId = null;
 let latestRows = [];
 let latestSourceLabel = null;
+let planVersionOptions = [];
+let currentPlanVersion = null;
 
 setElementVisible(notesEl, debugMode);
 setElementVisible(sourcePillEl, debugMode);
@@ -115,6 +124,121 @@ function setElementVisible(element, visible) {
   }
   element.hidden = !visible;
   element.classList.toggle('is-hidden', !visible);
+}
+
+function readStoredPlanVersion() {
+  try {
+    return window.localStorage?.getItem(PLAN_VERSION_STORAGE_KEY) || '';
+  } catch (_error) {
+    return '';
+  }
+}
+
+function writeStoredPlanVersion(planVersion) {
+  try {
+    if (planVersion) {
+      window.localStorage?.setItem(PLAN_VERSION_STORAGE_KEY, planVersion);
+    }
+  } catch (_error) {
+    // Storage may be unavailable inside embedded contexts; selection still works for this session.
+  }
+}
+
+function normalizeCycle(value) {
+  const raw = String(value ?? '').trim();
+  const match = raw.match(/\d{6}/);
+  return match ? match[0] : '';
+}
+
+function inferPlanVersionsFromRows(rows) {
+  const byVersion = new Map();
+  for (const rawRow of rows || []) {
+    const row = normalizeRow(rawRow);
+    const value = readMappedField(row, 'planVersion');
+    if (!value) {
+      continue;
+    }
+    const planVersion = String(value);
+    const existing = byVersion.get(planVersion) || { versao_plano: planVersion, ciclo: '', flag_ativo: false, source: 'projection_rows' };
+    existing.ciclo = existing.ciclo || normalizeCycle(readMappedField(row, 'cycle')) || normalizeCycle(planVersion);
+    byVersion.set(planVersion, existing);
+  }
+  return Array.from(byVersion.values());
+}
+
+function chooseDefaultPlanVersion(options) {
+  if (!options.length) {
+    return '';
+  }
+  const stored = readStoredPlanVersion();
+  if (stored && options.some((option) => option.versao_plano === stored)) {
+    return stored;
+  }
+  const sorted = [...options].sort((left, right) => {
+    const cycleDiff = String(right.ciclo || '').localeCompare(String(left.ciclo || ''));
+    if (cycleDiff !== 0) {
+      return cycleDiff;
+    }
+    return String(right.versao_plano || '').localeCompare(String(left.versao_plano || ''));
+  });
+  const activeLatestCycle = sorted.find((option) => option.flag_ativo);
+  return (activeLatestCycle || sorted[0]).versao_plano;
+}
+
+function setPlanVersionOptions(options, rows = latestRows) {
+  const inferred = inferPlanVersionsFromRows(rows);
+  const byVersion = new Map();
+  for (const option of inferred) {
+    byVersion.set(option.versao_plano, option);
+  }
+  for (const option of options || []) {
+    if (option.versao_plano) {
+      byVersion.set(option.versao_plano, { ...byVersion.get(option.versao_plano), ...option });
+    }
+  }
+  planVersionOptions = Array.from(byVersion.values()).sort((left, right) => {
+    const cycleDiff = String(right.ciclo || '').localeCompare(String(left.ciclo || ''));
+    if (cycleDiff !== 0) {
+      return cycleDiff;
+    }
+    return String(right.versao_plano || '').localeCompare(String(left.versao_plano || ''));
+  });
+  if (!currentPlanVersion || !planVersionOptions.some((option) => option.versao_plano === currentPlanVersion)) {
+    currentPlanVersion = chooseDefaultPlanVersion(planVersionOptions);
+  }
+  renderPlanVersionSelect();
+}
+
+function renderPlanVersionSelect() {
+  if (!planVersionSelectEl) {
+    return;
+  }
+  planVersionSelectEl.innerHTML = '';
+  if (!planVersionOptions.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'Sem versões disponíveis';
+    planVersionSelectEl.append(option);
+    planVersionSelectEl.disabled = true;
+    return;
+  }
+  planVersionSelectEl.disabled = false;
+  for (const planVersion of planVersionOptions) {
+    const option = document.createElement('option');
+    option.value = planVersion.versao_plano;
+    const activeSuffix = planVersion.flag_ativo ? ' · ativa' : '';
+    const cyclePrefix = planVersion.ciclo ? `${planVersion.ciclo} · ` : '';
+    option.textContent = `${cyclePrefix}${planVersion.versao_plano}${activeSuffix}`;
+    planVersionSelectEl.append(option);
+  }
+  planVersionSelectEl.value = currentPlanVersion || '';
+}
+
+function filterRowsBySelectedPlanVersion(rows) {
+  if (!currentPlanVersion) {
+    return rows || [];
+  }
+  return (rows || []).filter((rawRow) => String(readMappedField(normalizeRow(rawRow), 'planVersion') || '') === currentPlanVersion);
 }
 
 function setStatus(message, { visible = debugMode } = {}) {
@@ -526,15 +650,17 @@ function ensureTable(columns) {
 async function renderFromRows(rows, sourceLabel) {
   latestRows = rows;
   latestSourceLabel = sourceLabel;
+  setPlanVersionOptions(planVersionOptions, rows);
+  const filteredRows = filterRowsBySelectedPlanVersion(rows);
   const modeConfig = getModeConfig();
-  const { displayRows, skuCount, displayedSkuCount, skippedRows, excludedProposalRows, excludedProposalUnits, totalUnits, monthLabels } = buildDisplayRows(rows);
+  const { displayRows, skuCount, displayedSkuCount, skippedRows, excludedProposalRows, excludedProposalUnits, totalUnits, monthLabels } = buildDisplayRows(filteredRows);
   ensureTable(buildColumns(monthLabels));
   await table.replaceData(displayRows);
   setElementVisible(tableShellEl, true);
   setElementVisible(summaryPillEl, true);
   updateSummaryFromVisibleRows(displayRows);
   setStatus(
-    `Fonte: ${currentTableId || SOURCE_TABLE_ID}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(displayedSkuCount)} SKUs renderizados, ${numberFormatter.format(skuCount)} SKUs com pedido positivo, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12, ${numberFormatter.format(excludedProposalRows)} linhas sem proposta positiva excluídas, total excluído de ${numberFormatter.format(excludedProposalUnits)} un. Campos usados: ${modeConfig.fieldsNote}`,
+    `Fonte: ${currentTableId || SOURCE_TABLE_ID}. Versão: ${currentPlanVersion || 'todas'}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(filteredRows.length)} linhas na versão, ${numberFormatter.format(displayedSkuCount)} SKUs renderizados, ${numberFormatter.format(skuCount)} SKUs com pedido positivo, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12, ${numberFormatter.format(excludedProposalRows)} linhas sem proposta positiva excluídas, total excluído de ${numberFormatter.format(excludedProposalUnits)} un. Campos usados: ${modeConfig.fieldsNote}`,
     { visible: debugMode }
   );
 }
@@ -554,6 +680,18 @@ async function fetchRowsFromSelectedTable() {
   }
   const payload = await window.grist.fetchSelectedTable({ format: 'rows' });
   return rowsFromTablePayload(payload);
+}
+
+async function fetchPlanVersionOptions() {
+  const rows = await fetchRowsFromDocApi(PLAN_VERSION_TABLE_ID);
+  return rows
+    .filter((row) => row?.versao_plano)
+    .map((row) => ({
+      versao_plano: String(row.versao_plano),
+      ciclo: normalizeCycle(row.ciclo_normalizado || row.ciclo || row.versao_plano),
+      flag_ativo: row.flag_ativo === true || row.flag_ativo === 1 || row.flag_ativo === '1' || row.flag_ativo === 'true',
+      source: PLAN_VERSION_TABLE_ID,
+    }));
 }
 
 function persistStateInUrl() {
@@ -595,6 +733,14 @@ async function applyBasis(nextBasis) {
 async function refreshRows(reason) {
   try {
     setStatus(`Carregando dados (${reason})...`, { visible: debugMode });
+
+    if (!planVersionOptions.length) {
+      try {
+        setPlanVersionOptions(await fetchPlanVersionOptions(), latestRows);
+      } catch (error) {
+        console.warn('Não foi possível carregar versões do plano; inferindo a partir da projeção.', error);
+      }
+    }
 
     if (currentTableId === SOURCE_TABLE_ID && latestRows.length) {
       await renderFromRows(latestRows, 'grist.onRecords');
@@ -642,6 +788,14 @@ for (const button of basisToggleButtons) {
     void applyBasis(button.dataset.basisToggle);
   });
 }
+
+planVersionSelectEl?.addEventListener('change', () => {
+  currentPlanVersion = planVersionSelectEl.value;
+  writeStoredPlanVersion(currentPlanVersion);
+  if (latestRows.length) {
+    void renderFromRows(latestRows, latestSourceLabel || 'plan version change');
+  }
+});
 
 if (window.grist) {
   window.grist.ready({ requiredAccess: 'read table', columns: REQUESTED_COLUMNS });

@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6.3.0/dist/css/tabulator.min.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260511b" />
+    <link rel="stylesheet" href="./styles.css?v=20260511c" />
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <script src="https://unpkg.com/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
   </head>
@@ -34,6 +34,12 @@
               <button type="button" class="mode-toggle-button" data-basis-toggle="cost">Custo</button>
             </div>
           </div>
+          <label class="plan-version-card" for="plan-version-select">
+            <span class="mode-toggle-label">Versão do plano</span>
+            <select id="plan-version-select" class="plan-version-select" aria-label="Versão do plano">
+              <option value="">Carregando versões...</option>
+            </select>
+          </label>
           <div class="header-pills">
             <div id="source-pill" class="summary-pill source-pill">Fonte direta: <code>SaidaDados_ProjecaoEstoque</code></div>
             <div id="summary-pill" class="summary-pill" hidden></div>
@@ -48,6 +54,7 @@
         <span>Lê diretamente de <code>SaidaDados_ProjecaoEstoque</code>.</span>
         <span>Sem tabela de apoio.</span>
         <span>Mesmo widget atende emissão e recebimento com toggle.</span>
+        <span>Filtra a versão do plano selecionada pelo usuário.</span>
         <span>Use <code>?debug=1</code> para manter estes detalhes visíveis.</span>
       </section>
 
@@ -56,6 +63,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260511b"></script>
+    <script src="./app.js?v=20260511c"></script>
   </body>
 </html>
