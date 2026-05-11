@@ -227,8 +227,7 @@ function renderPlanVersionSelect() {
     const option = document.createElement('option');
     option.value = planVersion.versao_plano;
     const activeSuffix = planVersion.flag_ativo ? ' · ativa' : '';
-    const cyclePrefix = planVersion.ciclo ? `${planVersion.ciclo} · ` : '';
-    option.textContent = `${cyclePrefix}${planVersion.versao_plano}${activeSuffix}`;
+    option.textContent = `${planVersion.versao_plano}${activeSuffix}`;
     planVersionSelectEl.append(option);
   }
   planVersionSelectEl.value = currentPlanVersion || '';
