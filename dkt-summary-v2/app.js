@@ -338,6 +338,7 @@ function buildDisplayRows(rows) {
   }
 
   const displayRows = Array.from(groups.values()).sort((left, right) => left.id_material.localeCompare(right.id_material));
+  const actionableSkuCount = displayRows.filter((row) => toNumber(row.total) > 0).length;
   const totalRow = {
     _rowKey: '__total__',
     _rowType: 'total',
@@ -363,7 +364,8 @@ function buildDisplayRows(rows) {
 
   return {
     displayRows: [...displayRows, totalRow],
-    skuCount: displayRows.length,
+    skuCount: actionableSkuCount,
+    displayedSkuCount: displayRows.length,
     skippedRows,
     excludedProposalRows,
     excludedProposalUnits,
@@ -413,10 +415,11 @@ function numericHeaderFilter(placeholder = '>=') {
 function updateSummaryFromVisibleRows(rows) {
   const modeConfig = getModeConfig();
   const visibleRows = (rows || []).filter((row) => row && row._rowType !== 'total');
+  const actionableVisibleRows = visibleRows.filter((row) => toNumber(row.total) > 0);
   const visibleUnits = visibleRows.reduce((sum, row) => sum + toNumber(row.total), 0);
   const basisConfig = getBasisConfig();
   const formattedTotal = currentBasis === 'cost' ? currencyFormatter.format(visibleUnits) : `${numberFormatter.format(visibleUnits)} ${basisConfig.shortLabel}`;
-  summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${basisConfig.label} · ${numberFormatter.format(visibleRows.length)} SKUs · ${formattedTotal}`;
+  summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${basisConfig.label} · ${numberFormatter.format(actionableVisibleRows.length)} SKUs com pedido · ${formattedTotal}`;
 }
 
 function refreshVisibleSummaryFromTable() {
@@ -524,14 +527,14 @@ async function renderFromRows(rows, sourceLabel) {
   latestRows = rows;
   latestSourceLabel = sourceLabel;
   const modeConfig = getModeConfig();
-  const { displayRows, skuCount, skippedRows, excludedProposalRows, excludedProposalUnits, totalUnits, monthLabels } = buildDisplayRows(rows);
+  const { displayRows, skuCount, displayedSkuCount, skippedRows, excludedProposalRows, excludedProposalUnits, totalUnits, monthLabels } = buildDisplayRows(rows);
   ensureTable(buildColumns(monthLabels));
   await table.replaceData(displayRows);
   setElementVisible(tableShellEl, true);
   setElementVisible(summaryPillEl, true);
   updateSummaryFromVisibleRows(displayRows);
   setStatus(
-    `Fonte: ${currentTableId || SOURCE_TABLE_ID}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(skuCount)} SKUs renderizados, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12, ${numberFormatter.format(excludedProposalRows)} linhas sem proposta positiva excluídas, total excluído de ${numberFormatter.format(excludedProposalUnits)} un. Campos usados: ${modeConfig.fieldsNote}`,
+    `Fonte: ${currentTableId || SOURCE_TABLE_ID}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(displayedSkuCount)} SKUs renderizados, ${numberFormatter.format(skuCount)} SKUs com pedido positivo, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12, ${numberFormatter.format(excludedProposalRows)} linhas sem proposta positiva excluídas, total excluído de ${numberFormatter.format(excludedProposalUnits)} un. Campos usados: ${modeConfig.fieldsNote}`,
     { visible: debugMode }
   );
 }
