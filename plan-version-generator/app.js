@@ -12,13 +12,16 @@ const el = {
   periodCount: document.getElementById('period-count'),
   supportCount: document.getElementById('support-count'),
   outputCount: document.getElementById('output-count'),
+  resumePanel: document.getElementById('resume-panel'),
+  resumeText: document.getElementById('resume-text'),
+  resumeButton: document.getElementById('resume-button'),
 };
 
 const COPY_FIELDS = [
   'periodo','id_local','descricao','divisao','fornecedor','categoria','abc_index','pqr_index','xyz_index','index_produto','custo','preco_venda_medio','trigger_level_lote','lote','lead_time_meses','meses_entre_pedidos','recebimentos_confirmados','demanda','flag_validate','produto','metodo_estoque_seguranca','nivel_servico','cov_trimestre_referencia','cov_qtd_venda_trimestre_y_minus_1','cov_qtd_venda_trimestre_sinal_atual','cov_qtd_venda_trimestre_sinal_resolvido','cov_qtd_venda_media_diaria_trimestre_y_minus_1','cov_qtd_venda_media_diaria_trimestre_atual','cov_qtd_venda_media_diaria_trimestre_blended','qtd_std_venda_U12M','estoque_inicial_m00','cobertura_objetivo_dias','extra_cobertura_dias','id_produto'
 ];
 
-let state = { locations: [], plans: [], products: [], periods: [], supportRows: [], preview: null, running: false };
+let state = { locations: [], plans: [], products: [], periods: [], supportRows: [], outputRows: [], preview: null, running: false, resumablePlan: null };
 
 function docApi(){ return window.grist?.docApi || window.grist?.raw?.docApi; }
 function setBadge(kind,label){ el.badge.className = `badge badge-${kind}`; el.badge.textContent = label; }
@@ -76,15 +79,43 @@ function installNavigationWarning(){
   });
 }
 async function refreshTables(){
-  const [locations, plans, products, periods, supportRows] = await Promise.all([
-    fetchRows('Entrada_Locais'), fetchRows('Entrada_VersoesPlano'), fetchRows('Entrada_Produtos'), fetchRows('Entrada_Periodo'), fetchRows('Apoio_ProjecaoEstoque')
+  const [locations, plans, products, periods, supportRows, outputRows] = await Promise.all([
+    fetchRows('Entrada_Locais'), fetchRows('Entrada_VersoesPlano'), fetchRows('Entrada_Produtos'), fetchRows('Entrada_Periodo'), fetchRows('Apoio_ProjecaoEstoque'), fetchRows('SaidaDados_ProjecaoEstoque')
   ]);
-  state = {...state, locations, plans, products, periods, supportRows};
+  state = {...state, locations, plans, products, periods, supportRows, outputRows};
   el.location.innerHTML = '';
   for(const loc of locations.filter(l => l.flag_ativo !== false && l.id_local)){
     const opt = document.createElement('option'); opt.value = loc.id_local; opt.textContent = loc.nome ? `${loc.nome} (${loc.id_local})` : loc.id_local; el.location.appendChild(opt);
   }
+  renderResumePanel();
   setStatus(`Loaded ${locations.length} locations, ${products.length} products, ${periods.length} periods.`);
+}
+function planRows(planId){
+  const supportRows = state.supportRows.filter(r => Number(r.link_versao_plano) === Number(planId));
+  const outputRows = state.outputRows.filter(r => Number(r.link_versao_plano) === Number(planId));
+  return {supportRows, outputRows};
+}
+function outputKey(row){ return `${row.id_produto || row.produto || ''}|${row.periodo || ''}`; }
+function missingOutputRows(planId){
+  const {supportRows, outputRows} = planRows(planId);
+  const existing = new Set(outputRows.map(outputKey));
+  return supportRows.filter(row => !existing.has(outputKey(row)));
+}
+function renderResumePanel(){
+  const candidates = state.plans
+    .filter(plan => plan.status_geracao === 'generating')
+    .map(plan => ({plan, ...planRows(rowId(plan))}))
+    .filter(item => item.supportRows.length > item.outputRows.length);
+  state.resumablePlan = candidates[0]?.plan || null;
+  if (!state.resumablePlan) {
+    el.resumePanel.hidden = true;
+    return;
+  }
+  const planId = rowId(state.resumablePlan);
+  const {supportRows, outputRows} = planRows(planId);
+  el.resumePanel.hidden = false;
+  el.resumeText.textContent = `Plan ${state.resumablePlan.versao_plano} is incomplete: ${outputRows.length}/${supportRows.length} output rows copied. Resume will copy only missing rows.`;
+  el.resumeButton.disabled = state.running;
 }
 function buildSupportActions(planId, p){
   const existing = new Set(state.supportRows.filter(r => Number(r.link_versao_plano) === Number(planId)).map(r => `${r.id_produto || r.produto}|${r.periodo}`));
@@ -98,17 +129,46 @@ function buildSupportActions(planId, p){
   }
   return actions;
 }
+function outputFields(planId, row){
+  const fields = { link_versao_plano: planId };
+  for(const field of COPY_FIELDS){ if(field in row) fields[field] = row[field]; }
+  if(!fields.produto && fields.id_produto) fields.produto = fields.id_produto;
+  return fields;
+}
 function buildOutputActions(planId, supportRows){
-  return supportRows.map(row => {
-    const fields = { link_versao_plano: planId };
-    for(const field of COPY_FIELDS){ if(field in row) fields[field] = row[field]; }
-    if(!fields.produto && fields.id_produto) fields.produto = fields.id_produto;
-    return ['AddRecord','SaidaDados_ProjecaoEstoque',null,fields];
-  });
+  return supportRows.map(row => ['AddRecord','SaidaDados_ProjecaoEstoque',null,outputFields(planId, row)]);
+}
+async function copyOutputRowsWithProgress(planId, rowsToCopy){
+  const {outputRows, supportRows} = planRows(planId);
+  let copied = outputRows.length;
+  for (const batchRows of chunk(rowsToCopy, 200)) {
+    await apply(buildOutputActions(planId, batchRows));
+    copied += batchRows.length;
+    await apply([['UpdateRecord','Entrada_VersoesPlano',planId,{qtd_linhas_geradas:copied,status_geracao:'generating'}]]);
+    setStatus(`Copying output rows… ${copied}/${supportRows.length}`);
+  }
 }
 async function preview(){
   try{ state.preview = computePreview(); renderPreview(state.preview); setBadge('success','Ready'); setStatus('Preview ready. Final name/key shown before creation.'); }
   catch(err){ state.preview=null; renderPreview(null); setBadge('error','Fix inputs'); setStatus(err.message); }
+}
+async function resumePlan(){
+  if(state.running || !state.resumablePlan) return;
+  state.running = true; el.resumeButton.disabled = true; setBadge('running','Resuming'); setStatus('Resuming interrupted generation… Keep this widget open until completion.');
+  try{
+    const planId = rowId(state.resumablePlan);
+    const missing = missingOutputRows(planId);
+    await copyOutputRowsWithProgress(planId, missing);
+    await refreshTables();
+    const {supportRows, outputRows} = planRows(planId);
+    if(outputRows.length !== supportRows.length) throw new Error(`Resume incomplete: ${outputRows.length}/${supportRows.length} output rows copied.`);
+    await apply([['UpdateRecord','Entrada_VersoesPlano',planId,{status_geracao:'generated',qtd_linhas_geradas:outputRows.length,gerado_em:new Date().toISOString(),erro_geracao:''}]]);
+    setBadge('success','Resumed'); setStatus(`Completed ${state.resumablePlan.versao_plano}: ${outputRows.length}/${supportRows.length} output rows copied.`);
+  } catch(err) {
+    setBadge('error','Error'); setStatus(err.message || String(err));
+  } finally {
+    state.running=false; await refreshTables().catch(()=>{}); await preview().catch(()=>{});
+  }
 }
 async function createPlan(){
   if(state.running) return;
@@ -122,13 +182,13 @@ async function createPlan(){
     await apply(buildSupportActions(planId, p));
     await refreshTables();
     const source = state.supportRows.filter(r => Number(r.link_versao_plano) === Number(planId));
-    await apply(buildOutputActions(planId, source));
+    await copyOutputRowsWithProgress(planId, source);
     await apply([['UpdateRecord','Entrada_VersoesPlano',planId,{status_geracao:'generated',qtd_linhas_geradas:source.length,gerado_em:new Date().toISOString(),erro_geracao:''}]]);
     setBadge('success','Created'); setStatus(`Created inactive plan version ${p.versao_plano} with ${source.length} output rows. Activate manually after review.`);
   }catch(err){ setBadge('error','Error'); setStatus(err.message || String(err)); }
   finally{ state.running=false; await refreshTables().catch(()=>{}); await preview().catch(()=>{}); }
 }
 
-el.preview.addEventListener('click', preview); el.create.addEventListener('click', createPlan); [el.cycle, el.location, el.name].forEach(node => node.addEventListener('input', () => preview().catch(()=>{})));
+el.preview.addEventListener('click', preview); el.create.addEventListener('click', createPlan); el.resumeButton.addEventListener('click', resumePlan); [el.cycle, el.location, el.name].forEach(node => node.addEventListener('input', () => preview().catch(()=>{})));
 installNavigationWarning();
 (async function init(){ try{ if(window.grist?.ready) window.grist.ready({requiredAccess:'full'}); await refreshTables(); await preview(); } catch(err){ setBadge('error','Error'); setStatus(err.message || String(err)); } })();
