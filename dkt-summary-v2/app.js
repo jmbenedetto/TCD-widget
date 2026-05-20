@@ -58,6 +58,8 @@ const MODE_CONFIG = {
 };
 const params = new URLSearchParams(window.location.search);
 const debugMode = params.get('debug') === '1';
+const forceDiagnosticPanel = true;
+const diagnosticBuild = '20260520-dkt-summary-v2-diagnostics';
 const initialMode = params.get('mode') === 'recebimento' ? 'recebimento' : 'emissao';
 let currentMode = initialMode;
 const initialBasis = params.get('basis') === 'cost' ? 'cost' : 'units';
@@ -87,9 +89,9 @@ let latestSourceLabel = null;
 let planVersionOptions = [];
 let currentPlanVersion = null;
 
-setElementVisible(notesEl, debugMode);
-setElementVisible(sourcePillEl, debugMode);
-setElementVisible(statusEl, debugMode);
+setElementVisible(notesEl, forceDiagnosticPanel || debugMode);
+setElementVisible(sourcePillEl, forceDiagnosticPanel || debugMode);
+setElementVisible(statusEl, forceDiagnosticPanel || debugMode);
 applyModeUi();
 
 function getModeConfig() {
@@ -545,6 +547,35 @@ function updateSummaryFromVisibleRows(rows) {
   summaryPillEl.textContent = `${modeConfig.toggleLabel} · ${basisConfig.label} · ${numberFormatter.format(actionableVisibleRows.length)} SKUs com pedido · ${formattedTotal}`;
 }
 
+function updateDiagnosticPanel(details) {
+  if (!notesEl || !(forceDiagnosticPanel || debugMode)) {
+    return;
+  }
+  const lines = [
+    `Build: ${diagnosticBuild}`,
+    `Source label: ${details.sourceLabel || latestSourceLabel || 'n/a'}`,
+    `Current Grist table id: ${currentTableId || 'n/a'}`,
+    `Mode: ${currentMode}`,
+    `Basis: ${currentBasis}`,
+    `Selected plan version: ${currentPlanVersion || 'n/a'}`,
+    `Plan options: ${planVersionOptions.map((option) => `${option.versao_plano}${option.flag_ativo ? ' [ativo]' : ''}`).join(' | ') || 'n/a'}`,
+    `Rows received: ${numberFormatter.format(details.rowsReceived ?? 0)}`,
+    `Rows after selected-version filter: ${numberFormatter.format(details.filteredRows ?? 0)}`,
+    `Rows with proposta_pedido_qtd > 0: ${numberFormatter.format(details.positiveRows ?? 0)}`,
+    `Distinct SKUs with positive proposals: ${numberFormatter.format(details.positiveSkuCount ?? 0)}`,
+    `Display rows including total: ${numberFormatter.format(details.displayRows ?? 0)}`,
+    `Rendered SKUs: ${numberFormatter.format(details.displayedSkuCount ?? 0)}`,
+    `SKUs with positive rendered total: ${numberFormatter.format(details.skuCount ?? 0)}`,
+    `Total rendered measure: ${currentBasis === 'cost' ? currencyFormatter.format(details.totalUnits ?? 0) : `${numberFormatter.format(details.totalUnits ?? 0)} un.`}`,
+    `Skipped rows: ${numberFormatter.format(details.skippedRows ?? 0)}`,
+    `Rows excluded because proposta <= 0: ${numberFormatter.format(details.excludedProposalRows ?? 0)}`,
+    `First row keys: ${details.firstRowKeys || 'n/a'}`,
+    `Error: ${details.error || 'none'}`,
+  ];
+  notesEl.innerHTML = `<strong>Diagnóstico técnico temporário.</strong><pre style="white-space: pre-wrap; margin: 0.5rem 0 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; line-height: 1.35;">${escapeHtml(lines.join('\n'))}</pre>`;
+  setElementVisible(notesEl, true);
+}
+
 function refreshVisibleSummaryFromTable() {
   if (!table) {
     return;
@@ -653,6 +684,22 @@ async function renderFromRows(rows, sourceLabel) {
   const filteredRows = filterRowsBySelectedPlanVersion(rows);
   const modeConfig = getModeConfig();
   const { displayRows, skuCount, displayedSkuCount, skippedRows, excludedProposalRows, excludedProposalUnits, totalUnits, monthLabels } = buildDisplayRows(filteredRows);
+  const positiveRows = filteredRows.filter((rawRow) => toNumber(readMappedField(normalizeRow(rawRow), 'proposalQty')) > 0);
+  const positiveSkuCount = new Set(positiveRows.map((rawRow) => String(readMappedField(normalizeRow(rawRow), 'sku') || ''))).size;
+  updateDiagnosticPanel({
+    sourceLabel,
+    rowsReceived: rows.length,
+    filteredRows: filteredRows.length,
+    positiveRows: positiveRows.length,
+    positiveSkuCount,
+    displayRows: displayRows.length,
+    skuCount,
+    displayedSkuCount,
+    skippedRows,
+    excludedProposalRows,
+    totalUnits,
+    firstRowKeys: rows[0] ? Object.keys(normalizeRow(rows[0])).slice(0, 30).join(', ') : '',
+  });
   ensureTable(buildColumns(monthLabels));
   await table.replaceData(displayRows);
   setElementVisible(tableShellEl, true);
@@ -772,6 +819,7 @@ async function refreshRows(reason) {
     setElementVisible(summaryPillEl, false);
     const message = error instanceof Error ? error.message : String(error);
     setStatus(`Não foi possível carregar os dados: ${message}`, { visible: true });
+    updateDiagnosticPanel({ error: message });
     console.error(error);
   }
 }
