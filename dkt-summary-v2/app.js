@@ -59,7 +59,7 @@ const MODE_CONFIG = {
 const params = new URLSearchParams(window.location.search);
 const debugMode = params.get('debug') === '1';
 const forceDiagnosticPanel = true;
-const diagnosticBuild = '20260520-dkt-summary-v2-diagnostics';
+const diagnosticBuild = '20260520-dkt-summary-v2-fetchtable-fix';
 const initialMode = params.get('mode') === 'recebimento' ? 'recebimento' : 'emissao';
 let currentMode = initialMode;
 const initialBasis = params.get('basis') === 'cost' ? 'cost' : 'units';
@@ -755,11 +755,7 @@ async function applyMode(nextMode) {
   currentMode = nextMode;
   applyModeUi();
   persistStateInUrl();
-  if (latestRows.length) {
-    await renderFromRows(latestRows, latestSourceLabel || 'cached direct-source rows');
-    return;
-  }
-  setStatus(`Carregando visão de ${MODE_CONFIG[nextMode].toggleLabel.toLowerCase()}...`, { visible: debugMode });
+  await refreshRows(`mode changed to ${nextMode}`);
 }
 
 async function applyBasis(nextBasis) {
@@ -769,11 +765,7 @@ async function applyBasis(nextBasis) {
   currentBasis = nextBasis;
   applyModeUi();
   persistStateInUrl();
-  if (latestRows.length) {
-    await renderFromRows(latestRows, latestSourceLabel || 'cached direct-source rows');
-    return;
-  }
-  setStatus(`Carregando base ${MEASURE_BASIS_CONFIG[nextBasis].label.toLowerCase()}...`, { visible: debugMode });
+  await refreshRows(`basis changed to ${nextBasis}`);
 }
 
 async function refreshRows(reason) {
@@ -786,11 +778,6 @@ async function refreshRows(reason) {
       } catch (error) {
         console.warn('Não foi possível carregar versões do plano; inferindo a partir da projeção.', error);
       }
-    }
-
-    if (currentTableId === SOURCE_TABLE_ID && latestRows.length) {
-      await renderFromRows(latestRows, 'grist.onRecords');
-      return;
     }
 
     const fromSourceTable = await fetchRowsFromDocApi(SOURCE_TABLE_ID);
@@ -839,9 +826,7 @@ for (const button of basisToggleButtons) {
 planVersionSelectEl?.addEventListener('change', () => {
   currentPlanVersion = planVersionSelectEl.value;
   writeStoredPlanVersion(currentPlanVersion);
-  if (latestRows.length) {
-    void renderFromRows(latestRows, latestSourceLabel || 'plan version change');
-  }
+  void refreshRows('plan version change');
 });
 
 if (window.grist) {
@@ -849,7 +834,7 @@ if (window.grist) {
 
   window.grist.onRecords((records) => {
     latestRows = Array.isArray(records) ? records.map(normalizeRow) : [];
-    void renderFromRows(latestRows, 'grist.onRecords');
+    void refreshRows('onRecords payload received; fetching full source table');
   }, { format: 'rows' });
 
   window.grist.on('message', (message) => {
