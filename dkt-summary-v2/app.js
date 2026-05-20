@@ -14,6 +14,7 @@ const REQUESTED_COLUMNS = [
   { name: 'lote', optional: true },
   { name: 'flag_validate', optional: true },
   { name: 'proposta_pedido_qtd', optional: true },
+  { name: 'proposta_pedido_qtd_mil', optional: true },
   { name: 'vlr_custo_proposta_pedido_qtd', optional: true },
   { name: 'lead_time_meses', optional: true },
   { name: 'ultimo_periodo_possivel_pedido', optional: true },
@@ -32,6 +33,7 @@ const SOURCE_FIELD_MAP = {
   lot: ['lote'],
   validate: ['flag_validate'],
   proposalQty: ['proposta_pedido_qtd'],
+  proposalQtyMil: ['proposta_pedido_qtd_mil'],
   proposalCost: ['vlr_custo_proposta_pedido_qtd'],
   leadTime: ['lead_time_meses'],
   latestOrderPeriod: ['ultimo_periodo_possivel_pedido'],
@@ -58,14 +60,14 @@ const MODE_CONFIG = {
 };
 const params = new URLSearchParams(window.location.search);
 const debugMode = params.get('debug') === '1';
-const forceDiagnosticPanel = true;
-const diagnosticBuild = '20260520-dkt-summary-v2-fetchtable-fix';
+const forceDiagnosticPanel = false;
+const diagnosticBuild = '20260520-dkt-summary-v2-clean-mil-units';
 const initialMode = params.get('mode') === 'recebimento' ? 'recebimento' : 'emissao';
 let currentMode = initialMode;
 const initialBasis = params.get('basis') === 'cost' ? 'cost' : 'units';
 let currentBasis = initialBasis;
 const MEASURE_BASIS_CONFIG = {
-  units: { label: 'Unidades', shortLabel: 'un.', logicalField: 'proposalQty' },
+  units: { label: 'Mil unidades', shortLabel: 'mil un.', logicalField: 'proposalQtyMil' },
   cost: { label: 'Custo', shortLabel: 'R$', logicalField: 'proposalCost' },
 };
 const statusEl = document.getElementById('status');
@@ -378,6 +380,21 @@ function formatMeasure(value) {
   return formatNumeric(value);
 }
 
+function readMeasureValue(row) {
+  const rawProposalQty = toNumber(readMappedField(row, 'proposalQty'));
+  if (rawProposalQty <= 0) {
+    return 0;
+  }
+  if (currentBasis === 'cost') {
+    return toNumber(readMappedField(row, 'proposalCost'));
+  }
+  const explicitMil = readMappedField(row, 'proposalQtyMil');
+  if (explicitMil !== null && explicitMil !== undefined && explicitMil !== '') {
+    return toNumber(explicitMil);
+  }
+  return rawProposalQty / 1000;
+}
+
 function formatFlag(value) {
   if (value === null || value === undefined || value === '') {
     return '<span class="muted">—</span>';
@@ -410,7 +427,7 @@ function buildDisplayRows(rows) {
     }
 
     const rawProposalQty = toNumber(readMappedField(row, 'proposalQty'));
-    const measureValue = rawProposalQty > 0 ? toNumber(readMappedField(row, getBasisConfig().logicalField)) : 0;
+    const measureValue = readMeasureValue(row);
     const isActionableProposal = rawProposalQty > 0;
     const bucketValue = isActionableProposal ? measureValue : 0;
     if (!isActionableProposal) {
@@ -707,7 +724,7 @@ async function renderFromRows(rows, sourceLabel) {
   updateSummaryFromVisibleRows(displayRows);
   setStatus(
     `Fonte: ${currentTableId || SOURCE_TABLE_ID}. Versão: ${currentPlanVersion || 'todas'}. ${numberFormatter.format(rows.length)} linhas recebidas, ${numberFormatter.format(filteredRows.length)} linhas na versão, ${numberFormatter.format(displayedSkuCount)} SKUs renderizados, ${numberFormatter.format(skuCount)} SKUs com pedido positivo, ${numberFormatter.format(skippedRows)} linhas fora da janela M00-M12, ${numberFormatter.format(excludedProposalRows)} linhas sem proposta positiva excluídas, total excluído de ${numberFormatter.format(excludedProposalUnits)} un. Campos usados: ${modeConfig.fieldsNote}`,
-    { visible: debugMode }
+    { visible: forceDiagnosticPanel || debugMode }
   );
 }
 
