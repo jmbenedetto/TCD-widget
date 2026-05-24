@@ -18,7 +18,7 @@ const el = {
 };
 
 const COPY_FIELDS = [
-  'periodo','id_local','descricao','divisao','fornecedor','categoria','abc_index','pqr_index','xyz_index','index_produto','custo','preco_venda_medio','trigger_level_lote','lote','lead_time_meses','meses_entre_pedidos','recebimentos_confirmados','demanda','flag_validate','produto','metodo_estoque_seguranca','nivel_servico','cov_trimestre_referencia','cov_qtd_venda_trimestre_y_minus_1','cov_qtd_venda_trimestre_sinal_atual','cov_qtd_venda_trimestre_sinal_resolvido','cov_qtd_venda_media_diaria_trimestre_y_minus_1','cov_qtd_venda_media_diaria_trimestre_atual','cov_qtd_venda_media_diaria_trimestre_blended','qtd_std_venda_U12M','estoque_inicial_m00','cobertura_objetivo_dias','extra_cobertura_dias','id_produto'
+  'periodo','id_local','descricao','divisao','fornecedor','categoria','abc_index','pqr_index','xyz_index','index_produto','custo','preco_venda_medio','trigger_level_lote','lote','lead_time_meses','meses_entre_pedidos','recebimentos_confirmados','demanda','flag_validate','metodo_estoque_seguranca','nivel_servico','cov_trimestre_referencia','cov_qtd_venda_trimestre_y_minus_1','cov_qtd_venda_trimestre_sinal_atual','cov_qtd_venda_trimestre_sinal_resolvido','cov_qtd_venda_media_diaria_trimestre_y_minus_1','cov_qtd_venda_media_diaria_trimestre_atual','cov_qtd_venda_media_diaria_trimestre_blended','qtd_std_venda_U12M','estoque_inicial_m00','cobertura_objetivo_dias','extra_cobertura_dias','id_produto'
 ];
 
 let state = { locations: [], plans: [], products: [], periods: [], supportRows: [], outputRows: [], preview: null, running: false, resumablePlan: null };
@@ -124,7 +124,7 @@ function buildSupportActions(planId, p){
     for(const period of p.periods){
       const key = `${product.id_produto}|${period.periodo}`;
       if(existing.has(key)) continue;
-      actions.push(['AddRecord','Apoio_ProjecaoEstoque',null,{link_versao_plano: planId, id_produto: product.id_produto, produto: product.id_produto, periodo: period.periodo}]);
+      actions.push(['AddRecord','Apoio_ProjecaoEstoque',null,{link_versao_plano: planId, id_produto: product.id_produto, periodo: period.periodo}]);
     }
   }
   return actions;
@@ -132,7 +132,6 @@ function buildSupportActions(planId, p){
 function outputFields(planId, row){
   const fields = { link_versao_plano: planId };
   for(const field of COPY_FIELDS){ if(field in row) fields[field] = row[field]; }
-  if(!fields.produto && fields.id_produto) fields.produto = fields.id_produto;
   return fields;
 }
 function buildOutputActions(planId, supportRows){
