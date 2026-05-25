@@ -18,7 +18,7 @@ const el = {
 };
 
 const COPY_FIELDS = [
-  'periodo','id_local','descricao','divisao','fornecedor','categoria','abc_index','pqr_index','xyz_index','index_produto','custo','preco_venda_medio','trigger_level_lote','lote','lead_time_meses','meses_entre_pedidos','recebimentos_confirmados','demanda','flag_validate','metodo_estoque_seguranca','nivel_servico','cov_trimestre_referencia','cov_qtd_venda_trimestre_y_minus_1','cov_qtd_venda_trimestre_sinal_atual','cov_qtd_venda_trimestre_sinal_resolvido','cov_qtd_venda_media_diaria_trimestre_y_minus_1','cov_qtd_venda_media_diaria_trimestre_atual','cov_qtd_venda_media_diaria_trimestre_blended','qtd_std_venda_U12M','estoque_inicial_m00','cobertura_objetivo_dias','extra_cobertura_dias','id_produto'
+  'periodo','id_local','descricao','divisao','fornecedor','categoria','abc_index','pqr_index','xyz_index','index_produto','custo','preco_venda_medio','trigger_level_lote','lote','lead_time_meses','meses_entre_pedidos','recebimentos_confirmados','demanda','flag_validate','metodo_estoque_seguranca','nivel_servico','cov_trimestre_referencia','cov_qtd_venda_trimestre_y_minus_1','cov_qtd_venda_trimestre_sinal_atual','cov_qtd_venda_trimestre_sinal_resolvido','cov_qtd_venda_media_diaria_trimestre_y_minus_1','cov_qtd_venda_media_diaria_trimestre_atual','cov_qtd_venda_media_diaria_trimestre_blended','qtd_std_venda_U12M','estoque_inicial_m00','cobertura_objetivo_dias','extra_cobertura_dias','qtd_demanda_12M','id_produto'
 ];
 
 let state = { locations: [], plans: [], products: [], periods: [], supportRows: [], outputRows: [], preview: null, running: false, resumablePlan: null };
