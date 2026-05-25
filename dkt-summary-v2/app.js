@@ -3,7 +3,7 @@ const PLAN_VERSION_TABLE_ID = 'Entrada_VersoesPlano';
 const PLAN_VERSION_STORAGE_KEY = 'dkt-summary-v2:selected-plan-version';
 const MONTH_FIELDS = Array.from({ length: 13 }, (_, index) => `M${String(index).padStart(2, '0')}`);
 const REQUESTED_COLUMNS = [
-  { name: 'id_material', optional: true },
+  { name: 'id_produto', optional: true },
   { name: 'periodo', optional: true },
   { name: 'ano_mes', optional: true },
   { name: 'descricao', optional: true },
@@ -22,7 +22,7 @@ const REQUESTED_COLUMNS = [
   { name: 'ciclo', optional: true },
 ];
 const SOURCE_FIELD_MAP = {
-  sku: ['id_material'],
+  sku: ['id_produto'],
   period: ['periodo'],
   monthLabel: ['ano_mes'],
   description: ['descricao'],
@@ -47,7 +47,7 @@ const MODE_CONFIG = {
     subtitle: 'Revise as recomendações por período de emissão.',
     toggleLabel: 'Emissão',
     periodTransform: (row) => normalizePeriod(readMappedField(row, 'latestOrderPeriod')),
-    fieldsNote: 'id_material, ultimo_periodo_possivel_pedido, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd, vlr_custo_proposta_pedido_qtd.',
+    fieldsNote: 'id_produto, ultimo_periodo_possivel_pedido, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd, vlr_custo_proposta_pedido_qtd.',
   },
   recebimento: {
     kicker: 'Planejamento de suprimentos',
@@ -55,7 +55,7 @@ const MODE_CONFIG = {
     subtitle: 'Revise as recomendações por período de recebimento.',
     toggleLabel: 'Recebimento',
     periodTransform: (row) => normalizePeriod(readMappedField(row, 'period')),
-    fieldsNote: 'id_material, periodo, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd, vlr_custo_proposta_pedido_qtd.',
+    fieldsNote: 'id_produto, periodo, ano_mes, descricao, fornecedor, categoria, abc_index, custo, lote, flag_validate, proposta_pedido_qtd, vlr_custo_proposta_pedido_qtd.',
   },
 };
 const params = new URLSearchParams(window.location.search);
@@ -444,7 +444,7 @@ function buildDisplayRows(rows) {
     if (!groups.has(rowKey)) {
       groups.set(rowKey, {
         _rowKey: rowKey,
-        id_material: rowKey,
+        id_produto: rowKey,
         descricao: readMappedField(row, 'description') || '',
         fornecedor: readMappedField(row, 'supplier') || '',
         categoria: readMappedField(row, 'category') || '',
@@ -479,12 +479,12 @@ function buildDisplayRows(rows) {
     }
   }
 
-  const displayRows = Array.from(groups.values()).sort((left, right) => left.id_material.localeCompare(right.id_material));
+  const displayRows = Array.from(groups.values()).sort((left, right) => left.id_produto.localeCompare(right.id_produto));
   const actionableSkuCount = displayRows.filter((row) => toNumber(row.total) > 0).length;
   const totalRow = {
     _rowKey: '__total__',
     _rowType: 'total',
-    id_material: 'TOTAL GERAL',
+    id_produto: 'TOTAL GERAL',
     descricao: `${displayRows.length} SKUs`,
     fornecedor: '',
     categoria: '',
@@ -604,7 +604,7 @@ function buildColumns(monthLabels) {
   const baseColumns = [
     {
       title: 'SKU',
-      field: 'id_material',
+      field: 'id_produto',
       frozen: true,
       width: 128,
       resizable: true,
